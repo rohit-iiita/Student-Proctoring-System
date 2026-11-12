@@ -59,6 +59,7 @@ SET search_path = ''
 AS $$
 DECLARE
   display_name TEXT;
+  user_role public.user_role;
 BEGIN
   display_name := COALESCE(
     NULLIF(NEW.raw_user_meta_data ->> 'full_name', ''),
@@ -66,8 +67,17 @@ BEGIN
     'New User'
   );
 
+  -- Get and validate role
+  user_role := CASE
+    WHEN NEW.raw_user_meta_data ->> 'role' = 'faculty'
+      THEN 'faculty'::public.user_role
+    WHEN NEW.raw_user_meta_data ->> 'role' = 'admin'
+      THEN 'admin'::public.user_role
+    ELSE 'student'::public.user_role
+  END;
+
   INSERT INTO public.profiles (id, full_name, email, role)
-  VALUES (NEW.id, display_name, NEW.email, 'student')
+  VALUES (NEW.id, display_name, NEW.email, user_role)
   ON CONFLICT (id) DO NOTHING;
 
   RETURN NEW;
@@ -78,4 +88,5 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
-FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_auth_user();
