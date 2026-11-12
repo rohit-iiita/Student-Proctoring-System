@@ -54,20 +54,17 @@ CREATE TABLE IF NOT EXISTS public.meeting_participants (
   UNIQUE (meeting_id, user_id)
 );
 
--- Email outbox: a trusted backend worker processes these jobs.
-CREATE TABLE IF NOT EXISTS public.email_outbox (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  recipient_email TEXT NOT NULL,
-  template_key TEXT NOT NULL,
-  payload JSONB NOT NULL DEFAULT '{}'::JSONB,
-  status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
-  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-  available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  sent_at TIMESTAMPTZ,
-  last_error TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- To automatically update 'updated_at' field of 'public.meetings' table
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS set_meetings_updated_at ON public.meetings;
 

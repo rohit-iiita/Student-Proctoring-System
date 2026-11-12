@@ -15,6 +15,12 @@ ON public.complaints(assigned_to, status);
 CREATE INDEX IF NOT EXISTS idx_complaints_status_created
 ON public.complaints(status, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_complaint_respondents_complaint_id
+ON public.complaint_respondents(complaint_id);
+
+CREATE INDEX IF NOT EXISTS idx_complaint_respondents_student_id
+ON public.complaint_respondents(student_id);
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created
 ON public.notifications(user_id, created_at DESC);
 
@@ -30,7 +36,3 @@ ON public.meeting_participants(user_id, invitation_status);
 
 CREATE INDEX IF NOT EXISTS idx_meeting_participants_meeting
 ON public.meeting_participants(meeting_id);
-
-CREATE INDEX IF NOT EXISTS idx_email_outbox_pending
-ON public.email_outbox(available_at, created_at)
-WHERE status = 'pending';

@@ -1,5 +1,6 @@
 "use server";
 
+import { sendWelcomeUserEmailAction } from "../email/actions";
 import { LOGIN_SCHEMA, SIGNUP_SCHEMA } from "./schemas";
 import {
   getCurrentUserService,
@@ -7,8 +8,15 @@ import {
   logoutUserService,
   signupUserService,
 } from "./services";
+import type { TLoginInput, TSignupInput } from "./types";
 
-export async function loginAction(input: { email: string; password: string }) {
+export async function loginAction(input: TLoginInput) {
+  const currentUser = await getCurrentUserService();
+
+  if (currentUser) {
+    return { success: false, message: "Currently user logged in" };
+  }
+
   const validation = LOGIN_SCHEMA.safeParse(input);
 
   if (!validation.success) {
@@ -35,7 +43,13 @@ export async function loginAction(input: { email: string; password: string }) {
   }
 }
 
-export async function signupAction(input: unknown) {
+export async function signupAction(input: TSignupInput) {
+  const currentUser = await getCurrentUserService();
+
+  if (currentUser) {
+    return { success: false, message: "Currently user logged in" };
+  }
+
   const validation = SIGNUP_SCHEMA.safeParse(input);
 
   if (!validation.success) {
@@ -46,11 +60,20 @@ export async function signupAction(input: unknown) {
   }
 
   try {
-    const data = await signupUserService(validation.data);
+    const userData = await signupUserService(validation.data);
+
+    try {
+      await sendWelcomeUserEmailAction({
+        email: validation.data.email,
+        name: validation.data.fullName,
+      });
+    } catch (emailError) {
+      console.error("Welcome email failed:", emailError);
+    }
 
     return {
       success: true,
-      message: data.session
+      message: userData.session
         ? "Account created successfully"
         : "Account created. Please verify your email.",
     };
@@ -91,6 +114,7 @@ export async function getCurrentUserAction() {
       data: {
         ...user,
       },
+      message: "Fetched user's information successfully",
     };
   } catch (error) {
     console.error("Get current user error:", error);

@@ -1,5 +1,10 @@
+import "server-only";
+
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { config as dotenvConfig } from "dotenv";
+
+dotenvConfig();
 
 export async function createSupabaseClient() {
   const cookieStore = await cookies();
@@ -27,5 +32,3 @@ export async function createSupabaseClient() {
     },
   );
 }
-
-export const supabaseClient = await createSupabaseClient();
