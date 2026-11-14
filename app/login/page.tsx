@@ -115,7 +115,7 @@ export default function LoginPage() {
       setSuccessMessage(`Welcome back, ${matchedUser.name}! Redirecting to dashboard...`);
 
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(`/dashboard?role=${role}`);
       }, 900);
     }, 600);
   };
