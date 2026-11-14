@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import {
   mockUsers,
-  mockComplaints,
+  getComplaintById,
+  updateComplaint,
   availableFaculty,
   MockUser,
   MockComplaint,
@@ -25,14 +26,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   Paperclip,
-  Users,
-  Building,
-  CalendarDays,
-  FileClock,
   CheckCheck,
   MessageSquare,
   AlertCircle,
   Info,
+  FileIcon,
+  ImageIcon,
 } from "lucide-react";
 
 type UserRole = "student" | "faculty" | "admin";
@@ -64,32 +63,41 @@ function ComplaintDetailsContent() {
   const currentUser: MockUser =
     mockUsers.find((u) => u.role === role) || mockUsers[0];
 
-  // 2. Locate complaint from route param id (e.g. "c1", "c2")
+  // 2. Locate complaint from centralized store
   const complaintId = params?.id as string;
-  const initialComplaint = mockComplaints.find(
-    (c) => c.id === complaintId || c.refNumber.toLowerCase() === complaintId?.toLowerCase()
-  );
+  const [complaint, setComplaint] = React.useState<MockComplaint | undefined>(undefined);
 
-  // 3. Complaint state (for updates by Faculty or Admin)
-  const [complaint, setComplaint] = React.useState<MockComplaint | undefined>(initialComplaint);
+  React.useEffect(() => {
+    if (complaintId) {
+      const found = getComplaintById(complaintId);
+      setComplaint(found);
+    }
+  }, [complaintId]);
 
   // Admin Assignment State
-  const [selectedFaculty, setSelectedFaculty] = React.useState(
-    complaint?.assignedFaculty === "Unassigned" ? availableFaculty[0] : complaint?.assignedFaculty || availableFaculty[0]
-  );
+  const [selectedFaculty, setSelectedFaculty] = React.useState(availableFaculty[0]);
 
   // Faculty Review State
-  const [reviewStatus, setReviewStatus] = React.useState<MockComplaint["status"]>(
-    complaint?.status === "submitted" ? "under_review" : complaint?.status || "under_review"
-  );
-  const [reviewNotes, setReviewNotes] = React.useState(complaint?.notes || "");
+  const [reviewStatus, setReviewStatus] = React.useState<MockComplaint["status"]>("under_review");
+  const [reviewNotes, setReviewNotes] = React.useState("");
+
+  // Sync edit states when complaint loads
+  React.useEffect(() => {
+    if (complaint) {
+      if (complaint.assignedFaculty && complaint.assignedFaculty !== "Unassigned") {
+        setSelectedFaculty(complaint.assignedFaculty);
+      }
+      setReviewStatus(complaint.status === "submitted" ? "under_review" : complaint.status);
+      setReviewNotes(complaint.notes || "");
+    }
+  }, [complaint]);
 
   // Feedback states
   const [notesError, setNotesError] = React.useState("");
   const [successMessage, setSuccessMessage] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // 4. Handle Admin faculty assignment
+  // 3. Handle Admin faculty assignment (updates shared store)
   const handleAdminAssign = (e: React.FormEvent) => {
     e.preventDefault();
     if (!complaint) return;
@@ -97,21 +105,23 @@ function ComplaintDetailsContent() {
     setIsSaving(true);
     setSuccessMessage("");
 
-    // Simulate saving assignment to database
     setTimeout(() => {
-      complaint.assignedFaculty = selectedFaculty;
-      // If status was submitted, move it to under review
-      if (complaint.status === "submitted") {
-        complaint.status = "under_review";
+      const newStatus = complaint.status === "submitted" ? "under_review" : complaint.status;
+      const updated = updateComplaint(complaint.id, {
+        assignedFaculty: selectedFaculty,
+        status: newStatus,
+      });
+
+      if (updated) {
+        setComplaint({ ...updated });
       }
 
-      setComplaint({ ...complaint });
       setIsSaving(false);
       setSuccessMessage(`Complaint assigned to ${selectedFaculty} successfully!`);
     }, 500);
   };
 
-  // 5. Handle Faculty status update & notes
+  // 4. Handle Faculty status update & notes (updates shared store)
   const handleFacultyUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!complaint) return;
@@ -127,12 +137,16 @@ function ComplaintDetailsContent() {
 
     setIsSaving(true);
 
-    // Simulate updating complaint in database
     setTimeout(() => {
-      complaint.status = reviewStatus;
-      complaint.notes = reviewNotes.trim();
+      const updated = updateComplaint(complaint.id, {
+        status: reviewStatus,
+        notes: reviewNotes.trim(),
+      });
 
-      setComplaint({ ...complaint });
+      if (updated) {
+        setComplaint({ ...updated });
+      }
+
       setIsSaving(false);
       setSuccessMessage(`Complaint status updated to "${reviewStatus.replace('_', ' ').toUpperCase()}" successfully!`);
     }, 500);
@@ -457,16 +471,40 @@ function ComplaintDetailsContent() {
                   </div>
                 </div>
 
-                {/* Attachment Section */}
-                <div className="pt-1 flex items-center gap-2 text-xs text-zinc-600">
-                  <Paperclip className="w-4 h-4 text-zinc-400" />
-                  <span className="font-medium text-zinc-700">Attachment:</span>
-                  {complaint.attachmentName ? (
-                    <span className="font-mono text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded text-[11px]">
-                      {complaint.attachmentName}
-                    </span>
+                {/* Attachments Section: Shows all uploaded files with name and size */}
+                <div className="pt-2">
+                  <span className="text-xs font-semibold text-zinc-700 block mb-1.5 flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
+                    Attached Evidence Files
+                  </span>
+
+                  {complaint.attachments && complaint.attachments.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {complaint.attachments.map((att, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            {att.name.endsWith(".pdf") ? (
+                              <FileIcon className="w-4 h-4 text-red-500 shrink-0" />
+                            ) : (
+                              <ImageIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                            )}
+                            <span className="font-medium text-zinc-900 truncate">
+                              {att.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-zinc-500 bg-white border border-zinc-200 px-2 py-0.5 rounded-md font-mono shrink-0">
+                            {att.size}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <span className="text-zinc-400 italic">No attachment provided</span>
+                    <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-400 italic">
+                      No attachments were uploaded with this complaint.
+                    </div>
                   )}
                 </div>
 

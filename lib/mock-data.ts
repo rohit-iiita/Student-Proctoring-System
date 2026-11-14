@@ -1,4 +1,4 @@
-// Mock user data for testing the front-end before the backend is connected.
+// Mock user data and centralized complaints store for testing the front-end before the backend is connected.
 // NOTE: Your backend partner will replace this with real Supabase database queries later.
 
 export interface MockUser {
@@ -51,7 +51,7 @@ export const availableFaculty: string[] = [
   "Prof. Alan Turing",
 ];
 
-// Standard complaint categories
+// Exact standardized complaint categories used across the entire application
 export const complaintCategories: string[] = [
   "Ragging and Harassment",
   "TA",
@@ -60,7 +60,13 @@ export const complaintCategories: string[] = [
   "Discrimination and Misconduct",
 ];
 
-// Sample mock complaints
+// Attachment structure for uploaded files
+export interface ComplaintAttachment {
+  name: string;
+  size: string; // e.g. "1.2 MB", "450 KB"
+}
+
+// Full Complaint structure
 export interface MockComplaint {
   id: string;
   refNumber: string;
@@ -72,12 +78,12 @@ export interface MockComplaint {
   assignedFaculty: string;
   createdAt: string;
   respondents?: string;
-  attachmentName?: string;
+  attachments?: ComplaintAttachment[];
   notes?: string;
 }
 
-// Initial mock complaints list
-export const mockComplaints: MockComplaint[] = [
+// Initial mock complaints dataset
+export let mockComplaints: MockComplaint[] = [
   {
     id: "c1",
     refNumber: "CMP-2024-001",
@@ -90,7 +96,10 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Unassigned",
     createdAt: "2026-11-14",
     respondents: "Cafeteria Vendor Lead",
-    attachmentName: "cafeteria_photo_1.jpg",
+    attachments: [
+      { name: "cafeteria_photo_1.jpg", size: "1.4 MB" },
+      { name: "inspection_receipt.pdf", size: "420 KB" },
+    ],
     notes: "",
   },
   {
@@ -105,7 +114,9 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Dr. Sarah Smith",
     createdAt: "2026-11-12",
     respondents: "Hostel B Maintenance Staff",
-    attachmentName: "geyser_error_log.pdf",
+    attachments: [
+      { name: "geyser_error_log.pdf", size: "850 KB" },
+    ],
     notes: "Site inspection scheduled with the campus plumbing contractor.",
   },
   {
@@ -120,7 +131,10 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Dr. Sarah Smith",
     createdAt: "2026-11-10",
     respondents: "TA Mark Williams",
-    attachmentName: "lab2_test_results.png",
+    attachments: [
+      { name: "lab2_test_results.png", size: "2.1 MB" },
+      { name: "submission_code.pdf", size: "310 KB" },
+    ],
     notes: "Reviewed submission code. Test case runner bug confirmed and full marks updated in grading sheet.",
   },
   {
@@ -135,7 +149,9 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Dr. Robert Brown",
     createdAt: "2026-11-06",
     respondents: "Estate & Electrical Division",
-    attachmentName: "light_fixture.jpg",
+    attachments: [
+      { name: "light_fixture.jpg", size: "1.8 MB" },
+    ],
     notes: "Electrician replaced LED ballast fixtures on Nov 7.",
   },
   {
@@ -150,7 +166,9 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Dr. Sarah Smith",
     createdAt: "2026-11-04",
     respondents: "Block C 4th Floor Residents",
-    attachmentName: "audio_clip_recording.mp3",
+    attachments: [
+      { name: "dorm_corridor_photo.jpg", size: "980 KB" },
+    ],
     notes: "Anti-ragging committee meeting scheduled for Nov 18.",
   },
   {
@@ -165,10 +183,76 @@ export const mockComplaints: MockComplaint[] = [
     assignedFaculty: "Admin Review Board",
     createdAt: "2026-11-01",
     respondents: "Library Security Desk",
-    attachmentName: "desk_photo.jpg",
+    attachments: [
+      { name: "desk_photo.jpg", size: "1.1 MB" },
+    ],
     notes: "Librarian reported the issue was resolved on the spot; desk was cleared within 20 minutes.",
   },
 ];
+
+// =========================================================================
+// CENTRALIZED DATA HELPERS:
+// Used by Dashboard, Complaints List, and Details pages so changes sync everywhere
+// =========================================================================
+const STORAGE_KEY = "campus_complaints_data";
+
+// 1. Get all complaints (reads from browser localStorage if available, else in-memory mock)
+export function getComplaints(): MockComplaint[] {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          mockComplaints = parsed;
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse saved complaints", e);
+      }
+    }
+  }
+  return mockComplaints;
+}
+
+// 2. Save complaints to both in-memory variable and browser localStorage
+export function saveComplaints(newList: MockComplaint[]): void {
+  mockComplaints = newList;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+  }
+}
+
+// 3. Add a new complaint (prepends to list so it appears first)
+export function addComplaint(newComplaint: MockComplaint): void {
+  const current = getComplaints();
+  const updated = [newComplaint, ...current];
+  saveComplaints(updated);
+}
+
+// 4. Update an existing complaint (e.g. status change or faculty assignment)
+export function updateComplaint(
+  id: string,
+  updates: Partial<MockComplaint>
+): MockComplaint | undefined {
+  const current = getComplaints();
+  const index = current.findIndex(
+    (c) => c.id === id || c.refNumber.toLowerCase() === id.toLowerCase()
+  );
+  if (index === -1) return undefined;
+
+  current[index] = { ...current[index], ...updates };
+  saveComplaints([...current]);
+  return current[index];
+}
+
+// 5. Get a single complaint by ID or Reference Number
+export function getComplaintById(id: string): MockComplaint | undefined {
+  const current = getComplaints();
+  return current.find(
+    (c) => c.id === id || c.refNumber.toLowerCase() === id.toLowerCase()
+  );
+}
 
 // Sample mock meetings
 export interface MockMeeting {

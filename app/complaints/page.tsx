@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   mockUsers,
-  mockComplaints,
+  getComplaints,
   complaintCategories,
   MockUser,
   MockComplaint,
@@ -24,7 +24,6 @@ import {
   LogOut,
   PlusCircle,
   Search,
-  Filter,
   Eye,
   Info,
   Inbox,
@@ -48,10 +47,19 @@ function ComplaintsListContent() {
   const initialRole = (searchParams.get("role") as UserRole) || "student";
   const [role, setRole] = React.useState<UserRole>(initialRole);
 
+  // Centralized complaints list loaded from shared store (lib/mock-data.ts)
+  const [allComplaints, setAllComplaints] = React.useState<MockComplaint[]>([]);
+
+  // Load complaints from shared store
+  React.useEffect(() => {
+    setAllComplaints(getComplaints());
+  }, []);
+
   React.useEffect(() => {
     const roleParam = searchParams.get("role") as UserRole;
     if (roleParam && (roleParam === "student" || roleParam === "faculty" || roleParam === "admin")) {
       setRole(roleParam);
+      setAllComplaints(getComplaints());
     }
   }, [searchParams]);
 
@@ -64,19 +72,19 @@ function ComplaintsListContent() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
 
-  // 3. Filter complaints based on user's role:
+  // 3. Filter complaints based on user's role from the shared complaints store:
   // - Student: sees only their own complaints
   // - Faculty: sees only complaints assigned to them
   // - Admin: sees all complaints
   const baseComplaints: MockComplaint[] = React.useMemo(() => {
     if (role === "student") {
-      return mockComplaints.filter((c) => c.studentName === currentUser.name);
+      return allComplaints.filter((c) => c.studentName === currentUser.name);
     }
     if (role === "faculty") {
-      return mockComplaints.filter((c) => c.assignedFaculty === currentUser.name);
+      return allComplaints.filter((c) => c.assignedFaculty === currentUser.name);
     }
-    return mockComplaints;
-  }, [role, currentUser.name]);
+    return allComplaints;
+  }, [role, currentUser.name, allComplaints]);
 
   // 4. Apply search query, status filter, and category filter
   const filteredComplaints = React.useMemo(() => {
@@ -85,7 +93,7 @@ function ComplaintsListContent() {
       if (statusFilter !== "all" && c.status !== statusFilter) {
         return false;
       }
-      // Category filter
+      // Category filter (exact match with standardized categories)
       if (categoryFilter !== "all" && c.category.toLowerCase() !== categoryFilter.toLowerCase()) {
         return false;
       }

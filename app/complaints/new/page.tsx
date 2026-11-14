@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   mockUsers,
-  mockComplaints,
+  getComplaints,
+  addComplaint,
   complaintCategories,
   MockUser,
   MockComplaint,
+  ComplaintAttachment,
 } from "@/lib/mock-data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,14 +22,16 @@ import {
   Calendar,
   Bell,
   User,
-  GraduationCap,
-  Briefcase,
   LogOut,
   ArrowLeft,
   CheckCircle2,
   Paperclip,
   Users,
   AlertTriangle,
+  Upload,
+  X,
+  FileIcon,
+  ImageIcon,
 } from "lucide-react";
 
 type UserRole = "student" | "faculty" | "admin";
@@ -54,7 +58,10 @@ function NewComplaintContent() {
   const [subject, setSubject] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [respondents, setRespondents] = React.useState("");
-  const [attachmentName, setAttachmentName] = React.useState("");
+
+  // Attachments state: holds list of selected files with name and human-readable size
+  const [attachments, setAttachments] = React.useState<ComplaintAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = React.useState("");
 
   // 3. Field-level error messages
   const [categoryError, setCategoryError] = React.useState("");
@@ -65,11 +72,62 @@ function NewComplaintContent() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submittedComplaint, setSubmittedComplaint] = React.useState<MockComplaint | null>(null);
 
-  // 5. Form validation logic
+  // Helper function to format file sizes cleanly (e.g. 1.2 MB, 450 KB)
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  // 5. Handle file selection with type and size validation
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAttachmentError("");
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const filesArray = Array.from(e.target.files);
+    const validAttachments: ComplaintAttachment[] = [];
+    const maxSizeBytes = 5 * 1024 * 1024; // 5 MB maximum limit
+
+    // Allowed file types: PDF, JPG, PNG
+    const allowedExtensions = [".pdf", ".jpg", ".jpeg", ".png"];
+
+    for (const file of filesArray) {
+      const fileNameLower = file.name.toLowerCase();
+      const hasValidExt = allowedExtensions.some((ext) => fileNameLower.endsWith(ext));
+
+      // Check 1: File format validation
+      if (!hasValidExt) {
+        setAttachmentError(`"${file.name}" is not supported. Only PDF, JPG, and PNG files are allowed.`);
+        return;
+      }
+
+      // Check 2: File size validation (<= 5 MB)
+      if (file.size > maxSizeBytes) {
+        setAttachmentError(`"${file.name}" exceeds the 5 MB file size limit.`);
+        return;
+      }
+
+      validAttachments.push({
+        name: file.name,
+        size: formatFileSize(file.size),
+      });
+    }
+
+    // Append newly selected files to existing list
+    setAttachments((prev) => [...prev, ...validAttachments]);
+    // Reset input so user can pick more files if desired
+    e.target.value = "";
+  };
+
+  // Remove a chosen file by index
+  const handleRemoveAttachment = (indexToRemove: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // 6. Form validation logic
   const validateForm = () => {
     let isValid = true;
 
-    // Reset previous errors
     setCategoryError("");
     setSubjectError("");
     setDescriptionError("");
@@ -101,7 +159,7 @@ function NewComplaintContent() {
     return isValid;
   };
 
-  // 6. Handle form submit
+  // 7. Handle form submit and save to shared complaints store
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -111,12 +169,14 @@ function NewComplaintContent() {
 
     setIsSubmitting(true);
 
-    // NOTE: In the real application, your partner will insert this into the Supabase 'complaints' table.
-    // For now, we simulate saving by appending to our mockComplaints array in memory:
+    // NOTE: Real file upload and database record creation will be performed
+    // by your backend partner using Supabase Storage and database tables.
+    // Here we save the complaint and its file metadata to our shared mock data store:
     setTimeout(() => {
-      const newRefNumber = `CMP-2026-00${mockComplaints.length + 1}`;
+      const all = getComplaints();
+      const newRefNumber = `CMP-2026-00${all.length + 1}`;
       const newComplaint: MockComplaint = {
-        id: `c${mockComplaints.length + 1}`,
+        id: `c${all.length + 1}`,
         refNumber: newRefNumber,
         studentName: currentUser.name,
         category: category.trim(),
@@ -126,12 +186,12 @@ function NewComplaintContent() {
         assignedFaculty: "Unassigned",
         createdAt: new Date().toISOString().split("T")[0],
         respondents: respondents.trim() || undefined,
-        attachmentName: attachmentName.trim() || undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
         notes: "",
       };
 
-      // Push to mock array so it appears in the list and dashboard immediately
-      mockComplaints.unshift(newComplaint);
+      // Add to shared store so it updates Dashboard, List, and Details pages
+      addComplaint(newComplaint);
 
       setIsSubmitting(false);
       setSubmittedComplaint(newComplaint);
@@ -277,7 +337,7 @@ function NewComplaintContent() {
         {/* Page Body */}
         <main className="p-6 max-w-3xl space-y-6">
 
-          {/* Role Check: Only students can raise complaints */}
+          {/* Student Access Check */}
           {role !== "student" ? (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center space-y-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
@@ -436,24 +496,84 @@ function NewComplaintContent() {
                   </p>
                 </div>
 
-                {/* Optional Attachment Field */}
-                <div className="space-y-1">
-                  <Label htmlFor="attachment" className="text-xs font-medium text-zinc-700">
-                    Attachment / Evidence File <span className="text-zinc-400 font-normal">(Optional)</span>
+                {/* Multi-File Attachment Picker */}
+                <div className="space-y-2 pt-1">
+                  <Label htmlFor="file-upload" className="text-xs font-medium text-zinc-700 block">
+                    Attachments / Evidence Files <span className="text-zinc-400 font-normal">(Optional)</span>
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="attachment"
-                      type="text"
-                      placeholder="e.g. photo_evidence.jpg, medical_cert.pdf"
-                      value={attachmentName}
-                      onChange={(e) => setAttachmentName(e.target.value)}
-                      className="pl-9 text-xs"
+
+                  {/* Upload Drop Zone / Picker */}
+                  <div className="border border-dashed border-zinc-200 rounded-xl p-4 bg-zinc-50/50 hover:bg-zinc-50 transition-colors text-center">
+                    <input
+                      id="file-upload"
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleFileChange}
+                      className="hidden"
                     />
-                    <Paperclip className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <label
+                      htmlFor="file-upload"
+                      className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-600 shadow-xs">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div className="text-xs font-semibold text-zinc-900">
+                        Click to select files
+                      </div>
+                      <p className="text-[11px] text-zinc-400">
+                        Supports multiple files: <strong>PDF, JPG, PNG</strong> (up to 5 MB each)
+                      </p>
+                    </label>
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">
-                    For this front-end demo, you can enter any sample file name (e.g. photo.png). Real uploads will use Supabase Storage later.
+
+                  {/* Red error for wrong type or oversized file */}
+                  {attachmentError && (
+                    <p className="text-xs text-red-600 font-medium">{attachmentError}</p>
+                  )}
+
+                  {/* Chosen Files List with Name, Size, and Remove Button */}
+                  {attachments.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] font-semibold text-zinc-600">
+                        Selected Files ({attachments.length}):
+                      </span>
+                      <div className="space-y-1">
+                        {attachments.map((att, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-2 bg-white border border-zinc-200 rounded-xl text-xs"
+                          >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              {att.name.endsWith(".pdf") ? (
+                                <FileIcon className="w-4 h-4 text-red-500 shrink-0" />
+                              ) : (
+                                <ImageIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                              )}
+                              <span className="font-medium text-zinc-800 truncate">
+                                {att.name}
+                              </span>
+                              <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">
+                                {att.size}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAttachment(idx)}
+                              className="text-zinc-400 hover:text-red-600 p-1 rounded-md transition-colors shrink-0"
+                              title="Remove file"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-zinc-400 italic">
+                    Note: File metadata is stored with the complaint in front-end state. Real binary upload will be connected to Supabase Storage by the backend later.
                   </p>
                 </div>
 

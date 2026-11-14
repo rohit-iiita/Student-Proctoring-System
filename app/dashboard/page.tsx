@@ -3,7 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { mockUsers, mockComplaints, mockMeetings, MockUser, MockComplaint } from "@/lib/mock-data";
+import {
+  mockUsers,
+  getComplaints,
+  mockMeetings,
+  MockUser,
+  MockComplaint,
+} from "@/lib/mock-data";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -40,11 +46,21 @@ function DashboardContent() {
   const initialRole = (searchParams.get("role") as UserRole) || "student";
   const [role, setRole] = React.useState<UserRole>(initialRole);
 
-  // 2. Sync state if URL query param changes
+  // Centralized complaints list loaded from shared store (lib/mock-data.ts)
+  const [allComplaints, setAllComplaints] = React.useState<MockComplaint[]>([]);
+
+  // 2. Load latest complaints on mount and when role changes
+  React.useEffect(() => {
+    setAllComplaints(getComplaints());
+  }, []);
+
+  // Sync state if URL query param changes
   React.useEffect(() => {
     const roleParam = searchParams.get("role") as UserRole;
     if (roleParam && (roleParam === "student" || roleParam === "faculty" || roleParam === "admin")) {
       setRole(roleParam);
+      // Refresh complaints from shared store
+      setAllComplaints(getComplaints());
     }
   }, [searchParams]);
 
@@ -57,19 +73,19 @@ function DashboardContent() {
     router.push("/login");
   };
 
-  // 5. Filter complaints strictly according to the role:
+  // 5. Filter complaints strictly according to the role from the shared store:
   // - Student: sees only complaints raised by this student
   // - Faculty: sees only complaints assigned to this faculty
   // - Admin: sees all complaints across the institution
   const roleComplaints: MockComplaint[] = React.useMemo(() => {
     if (role === "student") {
-      return mockComplaints.filter((c) => c.studentName === currentUser.name);
+      return allComplaints.filter((c) => c.studentName === currentUser.name);
     }
     if (role === "faculty") {
-      return mockComplaints.filter((c) => c.assignedFaculty === currentUser.name);
+      return allComplaints.filter((c) => c.assignedFaculty === currentUser.name);
     }
-    return mockComplaints; // Admin sees all complaints
-  }, [role, currentUser.name]);
+    return allComplaints; // Admin sees all complaints
+  }, [role, currentUser.name, allComplaints]);
 
   // 6. Calculate statistics for summary cards (consistent with the table data)
   // Student statistics
@@ -169,7 +185,7 @@ function DashboardContent() {
             </Link>
 
             <Link
-              href="/complaints"
+              href={`/complaints?role=${role}`}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
             >
               <FileText className="w-4 h-4 text-zinc-400" />
@@ -295,8 +311,6 @@ function DashboardContent() {
         <main className="p-6 space-y-6">
 
           {/* Demo Role Switcher Banner */}
-          {/* NOTE: This role switcher is a temporary demo tool for presentation and testing.
-              In the real application, the user's role is strictly locked by the backend login. */}
           <div className="p-3 bg-zinc-100 border border-zinc-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-zinc-700">
               <Info className="w-4 h-4 text-zinc-500 shrink-0" />
@@ -478,11 +492,6 @@ function DashboardContent() {
           )}
 
           {/* ===================== RECENT COMPLAINTS TABLE ===================== */}
-          {/* Note: The table entries now strictly match the role:
-              - Student sees their own complaints
-              - Faculty sees their assigned complaints
-              - Admin sees all complaints
-          */}
           <div className="bg-white border border-zinc-200 rounded-2xl shadow-xs overflow-hidden">
             <div className="p-5 border-b border-zinc-100 flex items-center justify-between">
               <div>
@@ -498,7 +507,7 @@ function DashboardContent() {
                 </p>
               </div>
               <Link
-                href="/complaints"
+                href={`/complaints?role=${role}`}
                 className="text-xs font-semibold text-zinc-900 hover:text-zinc-600 underline"
               >
                 View all complaints &rarr;
@@ -521,6 +530,7 @@ function DashboardContent() {
                       {role === "student" && <th className="py-3 px-4">Assigned To</th>}
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Date</th>
+                      <th className="py-3 px-4 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 text-zinc-700">
@@ -552,6 +562,13 @@ function DashboardContent() {
                         </td>
                         <td className="py-3 px-4 text-zinc-400 whitespace-nowrap">
                           {item.createdAt}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Link href={`/complaints/${item.id}?role=${role}`}>
+                            <span className="text-xs font-semibold text-zinc-900 hover:underline cursor-pointer">
+                              View
+                            </span>
+                          </Link>
                         </td>
                       </tr>
                     ))}
