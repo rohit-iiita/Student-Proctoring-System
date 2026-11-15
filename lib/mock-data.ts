@@ -1,5 +1,7 @@
-// Mock user data and centralized complaints store for testing the front-end before the backend is connected.
-// NOTE: Your backend partner will replace this with real Supabase database queries later.
+// Mock user data and centralized store for complaints, meetings, and notifications.
+// NOTE: Your backend partner will replace this with real Supabase database queries and edge functions later.
+
+import { formatTime } from "./utils";
 
 export interface MockUser {
   id: string;
@@ -44,14 +46,14 @@ export const mockUsers: MockUser[] = [
   },
 ];
 
-// Available faculty members for assignment by Admin
+// Available faculty members
 export const availableFaculty: string[] = [
   "Dr. Sarah Smith",
   "Dr. Robert Brown",
   "Prof. Alan Turing",
 ];
 
-// Exact standardized complaint categories used across the entire application
+// Standardized complaint categories used across the entire application
 export const complaintCategories: string[] = [
   "Ragging and Harassment",
   "TA",
@@ -191,15 +193,194 @@ export let mockComplaints: MockComplaint[] = [
 ];
 
 // =========================================================================
-// CENTRALIZED DATA HELPERS:
-// Used by Dashboard, Complaints List, and Details pages so changes sync everywhere
+// MEETINGS DATA MODEL
 // =========================================================================
-const STORAGE_KEY = "campus_complaints_data";
+export interface MeetingParticipant {
+  name: string;
+  email: string;
+  role: "student" | "faculty";
+  response: "pending" | "accepted" | "declined";
+}
 
-// 1. Get all complaints (reads from browser localStorage if available, else in-memory mock)
+export interface MockMeeting {
+  id: string;
+  title: string;
+  complaintRef: string; // Linked complaint reference number
+  date: string; // YYYY-MM-DD
+  startTime: string; // e.g. "10:30"
+  endTime: string; // e.g. "11:30"
+  location: string;
+  meetingUrl?: string; // Optional online meeting link
+  organizerName: string;
+  organizerEmail: string;
+  organizerRole: "faculty" | "admin";
+  participants: MeetingParticipant[];
+  status: "scheduled" | "completed" | "cancelled";
+}
+
+export let mockMeetings: MockMeeting[] = [
+  {
+    id: "m1",
+    title: "Hostel Committee Inquiry regarding Block B Water",
+    complaintRef: "CMP-2024-002",
+    date: "2026-11-18",
+    startTime: "10:30",
+    endTime: "11:30",
+    location: "Faculty Lounge Room 204",
+    meetingUrl: "https://meet.google.com/hwb-ptsm-xyz",
+    organizerName: "Dr. Sarah Smith",
+    organizerEmail: "faculty@campus.edu",
+    organizerRole: "faculty",
+    participants: [
+      {
+        name: "Alex Johnson",
+        email: "student@campus.edu",
+        role: "student",
+        response: "pending",
+      },
+      {
+        name: "Dr. Sarah Smith",
+        email: "faculty@campus.edu",
+        role: "faculty",
+        response: "accepted",
+      },
+    ],
+    status: "scheduled",
+  },
+  {
+    id: "m2",
+    title: "Academic Grievance Hearing - OS Lab 2",
+    complaintRef: "CMP-2024-003",
+    date: "2026-11-20",
+    startTime: "14:00",
+    endTime: "15:00",
+    location: "CS Department Conference Hall",
+    organizerName: "Dr. Sarah Smith",
+    organizerEmail: "faculty@campus.edu",
+    organizerRole: "faculty",
+    participants: [
+      {
+        name: "Alex Johnson",
+        email: "student@campus.edu",
+        role: "student",
+        response: "accepted",
+      },
+    ],
+    status: "scheduled",
+  },
+  {
+    id: "m3",
+    title: "Preliminary Review on Noise Disturbance",
+    complaintRef: "CMP-2024-005",
+    date: "2026-11-05",
+    startTime: "11:00",
+    endTime: "11:45",
+    location: "Dean of Student Affairs Office",
+    organizerName: "Admin Officer",
+    organizerEmail: "admin@campus.edu",
+    organizerRole: "admin",
+    participants: [
+      {
+        name: "Dr. Sarah Smith",
+        email: "faculty@campus.edu",
+        role: "faculty",
+        response: "accepted",
+      },
+      {
+        name: "Alex Johnson",
+        email: "student@campus.edu",
+        role: "student",
+        response: "accepted",
+      },
+      {
+        name: "Dr. Robert Brown",
+        email: "brown@campus.edu",
+        role: "faculty",
+        response: "pending", // Shows "No response" in past meetings
+      },
+    ],
+    status: "completed",
+  },
+];
+
+// =========================================================================
+// NOTIFICATIONS DATA MODEL
+// =========================================================================
+export interface MockNotification {
+  id: string;
+  recipientEmail: string;
+  recipientRole: "student" | "faculty" | "admin";
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  link?: string;
+}
+
+export let mockNotifications: MockNotification[] = [
+  {
+    id: "n1",
+    recipientEmail: "student@campus.edu",
+    recipientRole: "student",
+    title: "Meeting Invitation",
+    message: "You have been invited to 'Hostel Committee Inquiry regarding Block B Water' on 2026-11-18.",
+    time: "10 mins ago",
+    read: false,
+    link: "/meetings?role=student",
+  },
+  {
+    id: "n2",
+    recipientEmail: "student@campus.edu",
+    recipientRole: "student",
+    title: "Complaint Under Review",
+    message: "Your complaint CMP-2024-002 has been assigned to Dr. Sarah Smith and is now Under Review.",
+    time: "2 hours ago",
+    read: false,
+    link: "/complaints/c2?role=student",
+  },
+  {
+    id: "n3",
+    recipientEmail: "faculty@campus.edu",
+    recipientRole: "faculty",
+    title: "New Complaint Assigned",
+    message: "Complaint CMP-2024-002 (Hostel) has been assigned to you for investigation.",
+    time: "1 day ago",
+    read: false,
+    link: "/complaints/c2?role=faculty",
+  },
+  {
+    id: "n4",
+    recipientEmail: "faculty@campus.edu",
+    recipientRole: "faculty",
+    title: "Meeting Response Received",
+    message: "Alex Johnson accepted your invitation for 'Academic Grievance Hearing - OS Lab 2'.",
+    time: "2 days ago",
+    read: true,
+    link: "/meetings?role=faculty",
+  },
+  {
+    id: "n5",
+    recipientEmail: "admin@campus.edu",
+    recipientRole: "admin",
+    title: "New Grievance Submitted",
+    message: "Alex Johnson submitted a new complaint CMP-2024-001 (Mess and Food).",
+    time: "3 hours ago",
+    read: false,
+    link: "/complaints/c1?role=admin",
+  },
+];
+
+// =========================================================================
+// CENTRALIZED STORE FUNCTIONS
+// =========================================================================
+const COMPLAINTS_KEY = "campus_complaints_data";
+const MEETINGS_KEY = "campus_meetings_data";
+const NOTIFICATIONS_KEY = "campus_notifications_data";
+
+// --- Complaints Helpers ---
 export function getComplaints(): MockComplaint[] {
   if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(COMPLAINTS_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -215,22 +396,32 @@ export function getComplaints(): MockComplaint[] {
   return mockComplaints;
 }
 
-// 2. Save complaints to both in-memory variable and browser localStorage
 export function saveComplaints(newList: MockComplaint[]): void {
   mockComplaints = newList;
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+    localStorage.setItem(COMPLAINTS_KEY, JSON.stringify(newList));
   }
 }
 
-// 3. Add a new complaint (prepends to list so it appears first)
 export function addComplaint(newComplaint: MockComplaint): void {
   const current = getComplaints();
   const updated = [newComplaint, ...current];
   saveComplaints(updated);
+
+  // Automatic Notification for Admin when a new complaint is filed
+  // NOTE: Real emails and push notifications will be dispatched by Supabase Edge Functions in production.
+  addNotification({
+    id: "notif_" + Date.now(),
+    recipientEmail: "admin@campus.edu",
+    recipientRole: "admin",
+    title: "New Grievance Submitted",
+    message: `${newComplaint.studentName} submitted a new complaint ${newComplaint.refNumber} (${newComplaint.category}).`,
+    time: "Just now",
+    read: false,
+    link: `/complaints/${newComplaint.id}?role=admin`,
+  });
 }
 
-// 4. Update an existing complaint (e.g. status change or faculty assignment)
 export function updateComplaint(
   id: string,
   updates: Partial<MockComplaint>
@@ -241,12 +432,48 @@ export function updateComplaint(
   );
   if (index === -1) return undefined;
 
+  const oldComplaint = current[index];
   current[index] = { ...current[index], ...updates };
   saveComplaints([...current]);
+
+  // 1. Notification: If assigned faculty changed -> Notify the assigned faculty member
+  if (updates.assignedFaculty && updates.assignedFaculty !== oldComplaint.assignedFaculty) {
+    const facultyUser = mockUsers.find((u) => u.name === updates.assignedFaculty);
+    if (facultyUser) {
+      addNotification({
+        id: "notif_assign_" + Date.now(),
+        recipientEmail: facultyUser.email,
+        recipientRole: "faculty",
+        title: "New Complaint Assigned",
+        message: `Complaint ${oldComplaint.refNumber} (${oldComplaint.category}) has been assigned to you.`,
+        time: "Just now",
+        read: false,
+        link: `/complaints/${oldComplaint.id}?role=faculty`,
+      });
+    }
+  }
+
+  // 2. Notification: If status changed -> Notify the student who submitted the grievance
+  if (updates.status && updates.status !== oldComplaint.status) {
+    const studentUser = mockUsers.find((u) => u.name === oldComplaint.studentName);
+    const formattedStatus = updates.status.replace("_", " ").toUpperCase();
+    if (studentUser) {
+      addNotification({
+        id: "notif_status_" + Date.now(),
+        recipientEmail: studentUser.email,
+        recipientRole: "student",
+        title: "Complaint Status Updated",
+        message: `Your complaint ${oldComplaint.refNumber} has been updated to ${formattedStatus}.`,
+        time: "Just now",
+        read: false,
+        link: `/complaints/${oldComplaint.id}?role=student`,
+      });
+    }
+  }
+
   return current[index];
 }
 
-// 5. Get a single complaint by ID or Reference Number
 export function getComplaintById(id: string): MockComplaint | undefined {
   const current = getComplaints();
   return current.find(
@@ -254,34 +481,130 @@ export function getComplaintById(id: string): MockComplaint | undefined {
   );
 }
 
-// Sample mock meetings
-export interface MockMeeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  facultyName: string;
-  studentName: string;
-  status: "scheduled" | "completed";
+// --- Meetings Helpers ---
+export function getMeetings(): MockMeeting[] {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem(MEETINGS_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          mockMeetings = parsed;
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse saved meetings", e);
+      }
+    }
+  }
+  return mockMeetings;
 }
 
-export const mockMeetings: MockMeeting[] = [
-  {
-    id: "m1",
-    title: "Hostel Committee Inquiry regarding Block B Water",
-    date: "2026-11-18",
-    time: "10:30 AM",
-    facultyName: "Dr. Sarah Smith",
-    studentName: "Alex Johnson",
-    status: "scheduled",
-  },
-  {
-    id: "m2",
-    title: "Academic Grievance Hearing - OS Lab 2",
-    date: "2026-11-20",
-    time: "02:00 PM",
-    facultyName: "Dr. Sarah Smith",
-    studentName: "Alex Johnson",
-    status: "scheduled",
-  },
-];
+export function saveMeetings(newList: MockMeeting[]): void {
+  mockMeetings = newList;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(MEETINGS_KEY, JSON.stringify(newList));
+  }
+}
+
+export function addMeeting(newMeeting: MockMeeting): void {
+  const current = getMeetings();
+  const updated = [newMeeting, ...current];
+  saveMeetings(updated);
+
+  // Automatic Notification: Notify each invited participant
+  // NOTE: Real email invitations will be sent by the backend Resend service later.
+  newMeeting.participants.forEach((p, idx) => {
+    const formattedStart = formatTime(newMeeting.startTime);
+    const formattedEnd = formatTime(newMeeting.endTime);
+    addNotification({
+      id: `notif_meet_${Date.now()}_${idx}`,
+      recipientEmail: p.email,
+      recipientRole: p.role,
+      title: "Meeting Invitation",
+      message: `You have been invited to '${newMeeting.title}' regarding ${newMeeting.complaintRef} on ${newMeeting.date} from ${formattedStart} to ${formattedEnd}.`,
+      time: "Just now",
+      read: false,
+      link: `/meetings?role=${p.role}`,
+    });
+  });
+}
+
+export function updateMeetingParticipantResponse(
+  meetingId: string,
+  userEmail: string,
+  response: "accepted" | "declined"
+): void {
+  const current = getMeetings();
+  const meeting = current.find((m) => m.id === meetingId);
+  if (!meeting) return;
+
+  const participant = meeting.participants.find((p) => p.email === userEmail);
+  if (participant) {
+    participant.response = response;
+    saveMeetings([...current]);
+
+    // Automatic Notification: Notify the meeting organizer of the participant's response
+    addNotification({
+      id: `notif_resp_${Date.now()}`,
+      recipientEmail: meeting.organizerEmail,
+      recipientRole: meeting.organizerRole,
+      title: "Meeting Response Received",
+      message: `${participant.name} has ${response.toUpperCase()} your meeting invitation for '${meeting.title}'.`,
+      time: "Just now",
+      read: false,
+      link: `/meetings?role=${meeting.organizerRole}`,
+    });
+  }
+}
+
+// --- Notifications Helpers ---
+export function getNotifications(): MockNotification[] {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem(NOTIFICATIONS_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          mockNotifications = parsed;
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse saved notifications", e);
+      }
+    }
+  }
+  return mockNotifications;
+}
+
+export function saveNotifications(newList: MockNotification[]): void {
+  mockNotifications = newList;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(newList));
+  }
+}
+
+export function addNotification(notif: MockNotification): void {
+  const current = getNotifications();
+  const updated = [notif, ...current];
+  saveNotifications(updated);
+}
+
+export function markNotificationAsRead(id: string): void {
+  const current = getNotifications();
+  const updated = current.map((n) => (n.id === id ? { ...n, read: true } : n));
+  saveNotifications(updated);
+}
+
+export function markAllNotificationsAsRead(userEmail: string): void {
+  const current = getNotifications();
+  const updated = current.map((n) =>
+    n.recipientEmail === userEmail ? { ...n, read: true } : n
+  );
+  saveNotifications(updated);
+}
+
+export function getUnreadNotificationCount(userEmail: string): number {
+  const current = getNotifications();
+  return current.filter((n) => n.recipientEmail === userEmail && !n.read).length;
+}

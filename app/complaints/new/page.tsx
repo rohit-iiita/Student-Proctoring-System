@@ -7,6 +7,7 @@ import {
   mockUsers,
   getComplaints,
   addComplaint,
+  getUnreadNotificationCount,
   complaintCategories,
   MockUser,
   MockComplaint,
@@ -71,6 +72,11 @@ function NewComplaintContent() {
   // 4. Submission status states
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submittedComplaint, setSubmittedComplaint] = React.useState<MockComplaint | null>(null);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    setUnreadCount(getUnreadNotificationCount(currentUser.email));
+  }, [currentUser]);
 
   // Helper function to format file sizes cleanly (e.g. 1.2 MB, 450 KB)
   const formatFileSize = (bytes: number): string => {
@@ -242,7 +248,7 @@ function NewComplaintContent() {
             </Link>
 
             <Link
-              href="/meetings"
+              href={`/meetings?role=${role}`}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
             >
               <Calendar className="w-4 h-4 text-zinc-400" />
@@ -250,11 +256,18 @@ function NewComplaintContent() {
             </Link>
 
             <Link
-              href="/notifications"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+              href={`/notifications?role=${role}`}
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
             >
-              <Bell className="w-4 h-4 text-zinc-400" />
-              <span>Notifications</span>
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 text-zinc-400" />
+                <span>Notifications</span>
+              </div>
+              {unreadCount > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white leading-none">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
 
             <div className="pt-3 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-400">

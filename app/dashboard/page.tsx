@@ -6,10 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   mockUsers,
   getComplaints,
-  mockMeetings,
+  getMeetings,
+  getUnreadNotificationCount,
   MockUser,
   MockComplaint,
 } from "@/lib/mock-data";
+import { getMeetingStatus } from "@/lib/utils";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -46,21 +48,38 @@ function DashboardContent() {
   const initialRole = (searchParams.get("role") as UserRole) || "student";
   const [role, setRole] = React.useState<UserRole>(initialRole);
 
-  // Centralized complaints list loaded from shared store (lib/mock-data.ts)
+  // Centralized complaints and meetings loaded from shared store (lib/mock-data.ts)
   const [allComplaints, setAllComplaints] = React.useState<MockComplaint[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [facultyUpcomingMeetingsCount, setFacultyUpcomingMeetingsCount] = React.useState(0);
 
-  // 2. Load latest complaints on mount and when role changes
+  // 2. Load latest data on mount and when role changes
+  const loadData = () => {
+    const complaints = getComplaints();
+    setAllComplaints(complaints);
+
+    const user = mockUsers.find((u) => u.role === role) || mockUsers[0];
+    setUnreadCount(getUnreadNotificationCount(user.email));
+
+    // Dynamic upcoming & live meetings count from shared getMeetings()
+    const meetings = getMeetings();
+    const upcomingForFaculty = meetings.filter(
+      (m) =>
+        (m.organizerEmail === user.email || m.participants.some((p) => p.email === user.email)) &&
+        getMeetingStatus(m.date, m.startTime, m.endTime, m.status) !== "past"
+    ).length;
+    setFacultyUpcomingMeetingsCount(upcomingForFaculty);
+  };
+
   React.useEffect(() => {
-    setAllComplaints(getComplaints());
-  }, []);
+    loadData();
+  }, [role]);
 
   // Sync state if URL query param changes
   React.useEffect(() => {
     const roleParam = searchParams.get("role") as UserRole;
     if (roleParam && (roleParam === "student" || roleParam === "faculty" || roleParam === "admin")) {
       setRole(roleParam);
-      // Refresh complaints from shared store
-      setAllComplaints(getComplaints());
     }
   }, [searchParams]);
 
@@ -104,9 +123,6 @@ function DashboardContent() {
   ).length;
   const facultyResolved = roleComplaints.filter(
     (c) => c.status === "resolved"
-  ).length;
-  const facultyUpcomingMeetings = mockMeetings.filter(
-    (m) => m.facultyName === currentUser.name && m.status === "scheduled"
   ).length;
 
   // Admin statistics
@@ -193,19 +209,27 @@ function DashboardContent() {
             </Link>
 
             <Link
-              href="/meetings"
+              href={`/meetings?role=${role}`}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
             >
               <Calendar className="w-4 h-4 text-zinc-400" />
               <span>Meetings</span>
             </Link>
 
+            {/* Notifications link with unread count badge */}
             <Link
-              href="/notifications"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+              href={`/notifications?role=${role}`}
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
             >
-              <Bell className="w-4 h-4 text-zinc-400" />
-              <span>Notifications</span>
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 text-zinc-400" />
+                <span>Notifications</span>
+              </div>
+              {unreadCount > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white leading-none">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
 
             {/* Admin-only links: Manage Students & Faculty */}
@@ -438,8 +462,8 @@ function DashboardContent() {
                     <CalendarCheck className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-purple-600 mt-2">{facultyUpcomingMeetings}</div>
-                <div className="text-[11px] text-zinc-400 mt-1">Scheduled with students</div>
+                <div className="text-2xl font-bold text-purple-600 mt-2">{facultyUpcomingMeetingsCount}</div>
+                <div className="text-[11px] text-zinc-400 mt-1">Scheduled inquiry sessions</div>
               </div>
             </div>
           )}
