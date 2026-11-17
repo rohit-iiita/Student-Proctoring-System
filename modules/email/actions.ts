@@ -6,6 +6,10 @@ import {
   COMPLAINT_REGISTRATION_EMAIL_SCHEMA,
   WELCOME_USER_EMAIL_SCHEMA,
 } from "./schemas";
+import {
+  successfullComplaintRegistrationEmailService,
+  welcomeUserEmailService,
+} from "./services";
 import type { TEmailJob } from "./types";
 
 export async function sendWelcomeUserEmailAction(data: {
@@ -22,21 +26,22 @@ export async function sendWelcomeUserEmailAction(data: {
   }
 
   try {
-    await enqueueEmailJob({
-      type: "welcome_user",
-      data,
-    });
+    // await enqueueEmailJob({
+    //   type: "welcome_user",
+    //   data,
+    // });
+    await welcomeUserEmailService({ email: data.email, name: data.name });
 
     return {
       success: true,
-      message: "Welcome email added to queue.",
+      message: "Welcome email added sent.",
     };
   } catch (error: unknown) {
     const err = error as Error;
 
     return {
       success: "false",
-      message: `WELCOME EMAIL not added to queue - ${err.message}`,
+      message: `WELCOME EMAIL not sent - ${err.message}`,
     };
   }
 }
@@ -54,21 +59,29 @@ export async function sendComplaintRegisteredEmailAction(
   }
 
   try {
-    await enqueueEmailJob({
-      type: "complaint_registered",
-      data,
+    // await enqueueEmailJob({
+    //   type: "complaint_registered",
+    //   data,
+    // });
+    await successfullComplaintRegistrationEmailService({
+      category: data.category,
+      complaintId: data.category,
+      email: data.email,
+      name: data.name,
+      subject: data.subject,
+      submittedAt: data.submittedAt,
     });
 
     return {
       success: true,
-      message: "Complaint registration email added to queue.",
+      message: "Complaint registration sent successfully.",
     };
   } catch (error) {
     const err = error as Error;
 
     return {
       success: false,
-      message: `COMPLAINT REGISTRATION EMAIL not added to queue - ${err.message}`,
+      message: `COMPLAINT REGISTRATION EMAIL not sent - ${err.message}`,
     };
   }
 }
@@ -86,21 +99,21 @@ export async function sendComplaintMeetingEmailAction(
   }
 
   try {
-    await enqueueEmailJob({
-      type: "complaint_meeting_created",
-      data,
-    });
+    // await enqueueEmailJob({
+    //   type: "complaint_meeting_created",
+    //   data,
+    // });
 
     return {
       success: true,
-      message: "Meeting email added to queue.",
+      message: "Meeting email sent successfully.",
     };
   } catch (error) {
     const err = error as Error;
 
     return {
       success: false,
-      message: `COMPLAINT MEETING EMAIL not added to queue - ${err.message}`,
+      message: `COMPLAINT MEETING EMAIL not sent - ${err.message}`,
     };
   }
 }

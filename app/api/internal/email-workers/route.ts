@@ -7,9 +7,6 @@ import {
 } from "@/modules/email/services";
 import type { TEmailJob } from "@/modules/email/types";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const MAX_RETRIES = 5;
 
 async function processEmailJob(job: TEmailJob) {

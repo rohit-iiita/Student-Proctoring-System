@@ -31,6 +31,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS public.meetings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  complaint_id UUID REFERENCES public.complaints(id) ON DELETE SET NULL,
   created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   title TEXT NOT NULL,
   description TEXT,

@@ -17,13 +17,14 @@ DO $$ BEGIN
     'hostel',
     'mess_and_food',
     'discrimination_and_misconduct'
-  )
+  );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reference_id TEXT NOT NULL,
+  assigned_to UUID REFERENCES public.faculty(id)
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   category public.complaint_category NOT NULL DEFAULT 'hostel',
   subject TEXT NOT NULL,

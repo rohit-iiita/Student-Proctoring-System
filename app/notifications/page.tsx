@@ -1,30 +1,35 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getCurrentUserService } from "@/modules/auth/services";
+import { getNotificationsAction } from "@/modules/notifications/actions";
+import NotificationsList from "./_components/notifications-list";
 
-import * as React from "react";
-import Link from "next/link";
-import { Bell, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+export const metadata = {
+  title: "Notifications - Student Proctoring System",
+  description:
+    "View your in-app notifications, including new complaints and complaint assignments.",
+};
 
-export default function NotificationsPlaceholderPage() {
+// Auth-gated: reads cookies() per request; opt out of prerendering
+export const instant = false;
+
+export default async function NotificationsPage() {
+  const user = await getCurrentUserService();
+
+  // If not logged in, redirect to the sign-in page
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Fetch the signed-in user's notifications from the database
+  const response = await getNotificationsAction();
+
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white border border-zinc-200 rounded-2xl p-8 text-center shadow-xs">
-        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4">
-          <Bell className="w-6 h-6" />
-        </div>
-        <h1 className="text-xl font-bold text-zinc-900">Notifications Center</h1>
-        <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
-          This module is part of our step-by-step build plan and will be implemented in <strong>Step (e)</strong> (in-app notifications, unread badges, and status updates).
-        </p>
-        <div className="mt-6">
-          <Link href="/dashboard">
-            <Button variant="outline" className="w-full text-xs font-medium">
-              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </div>
+    <NotificationsList
+      notifications={response.data ?? []}
+      userRole={user.role}
+      userName={user.fullName}
+      userEmail={user.email ?? ""}
+      idNumber={user.idNumber ?? null}
+    />
   );
 }
