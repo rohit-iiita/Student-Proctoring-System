@@ -32,7 +32,13 @@ type UserRole = "student" | "faculty" | "admin";
 
 export default function ProfilePage() {
   return (
-    <React.Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading profile...</div>}>
+    <React.Suspense
+      fallback={
+        <div className="p-8 text-center text-sm text-zinc-500">
+          Loading profile...
+        </div>
+      }
+    >
       <ProfileContent />
     </React.Suspense>
   );
@@ -48,7 +54,12 @@ function ProfileContent() {
 
   React.useEffect(() => {
     const roleParam = searchParams.get("role") as UserRole;
-    if (roleParam && (roleParam === "student" || roleParam === "faculty" || roleParam === "admin")) {
+    if (
+      roleParam &&
+      (roleParam === "student" ||
+        roleParam === "faculty" ||
+        roleParam === "admin")
+    ) {
       setRole(roleParam);
     }
   }, [searchParams]);
@@ -61,7 +72,9 @@ function ProfileContent() {
   // 3. Form input states (initialized from current user)
   const [fullName, setFullName] = React.useState(currentUser.name);
   const [phone, setPhone] = React.useState(currentUser.phone || "");
-  const [department, setDepartment] = React.useState(currentUser.department || "Computer Science & Engineering");
+  const [department, setDepartment] = React.useState(
+    currentUser.department || "Computer Science & Engineering",
+  );
 
   // Change-password states
   const [currentPassword, setCurrentPassword] = React.useState("");
@@ -137,7 +150,9 @@ function ProfileContent() {
       setPhoneError("Phone number is required.");
       isValid = false;
     } else if (cleanedPhone.length < 10) {
-      setPhoneError("Please enter a valid phone number with at least 10 digits.");
+      setPhoneError(
+        "Please enter a valid phone number with at least 10 digits.",
+      );
       isValid = false;
     }
 
@@ -159,7 +174,9 @@ function ProfileContent() {
         setCurrentPasswordError("Please enter your current password.");
         isValid = false;
       } else if (currentPassword !== currentUser.password) {
-        setCurrentPasswordError("Current password is incorrect (mock password is 'password123').");
+        setCurrentPasswordError(
+          "Current password is incorrect (mock password is 'password123').",
+        );
         isValid = false;
       }
 
@@ -168,10 +185,14 @@ function ProfileContent() {
         setNewPasswordError("Please enter a new password.");
         isValid = false;
       } else if (!isValidPassword(newPassword)) {
-        setNewPasswordError("New password must be at least 8 characters, with at least one letter and one number.");
+        setNewPasswordError(
+          "New password must be at least 8 characters, with at least one letter and one number.",
+        );
         isValid = false;
       } else if (newPassword === currentPassword) {
-        setNewPasswordError("New password must be different from your current password.");
+        setNewPasswordError(
+          "New password must be different from your current password.",
+        );
         isValid = false;
       }
 
@@ -227,7 +248,6 @@ function ProfileContent() {
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col md:flex-row">
-
       {/* ===================== SIDEBAR ===================== */}
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 flex flex-col justify-between shrink-0">
         <div>
@@ -346,7 +366,6 @@ function ProfileContent() {
 
       {/* ===================== MAIN CONTENT ===================== */}
       <div className="flex-1 flex flex-col min-w-0">
-
         {/* Top Navbar */}
         <header className="h-16 bg-white border-b border-zinc-200 px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -380,9 +399,8 @@ function ProfileContent() {
 
         {/* Page Body */}
         <main className="p-6 max-w-4xl space-y-6">
-
           {/* Demo Role Switcher Banner */}
-          <div className="p-3 bg-zinc-100 border border-zinc-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          {/* <div className="p-3 bg-zinc-100 border border-zinc-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-zinc-700">
               <Info className="w-4 h-4 text-zinc-500 shrink-0" />
               <span>
@@ -421,20 +439,20 @@ function ProfileContent() {
                 Admin
               </button>
             </div>
-          </div>
+          </div> */}
 
           {/* Success banner on save */}
           {successMessage && (
             <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-2xl flex items-center gap-2 font-medium">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                {successMessage} (Note: Changes are saved in front-end mock state and will connect to Supabase backend in production).
+                {successMessage} (Note: Changes are saved in front-end mock
+                state and will connect to Supabase backend in production).
               </span>
             </div>
           )}
 
           <form onSubmit={handleSave} className="space-y-6" noValidate>
-
             {/* ================= SECTION 1: PERSONAL INFORMATION ================= */}
             <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-xs space-y-5">
               <div>
@@ -447,10 +465,12 @@ function ProfileContent() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                 {/* Full Name (Editable) */}
                 <div className="space-y-1">
-                  <Label htmlFor="full-name" className="text-xs font-medium text-zinc-700">
+                  <Label
+                    htmlFor="full-name"
+                    className="text-xs font-medium text-zinc-700"
+                  >
                     Full Name
                   </Label>
                   <div className="relative">
@@ -467,13 +487,18 @@ function ProfileContent() {
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                   </div>
                   {nameError && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">{nameError}</p>
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      {nameError}
+                    </p>
                   )}
                 </div>
 
                 {/* Phone Number (Editable) */}
                 <div className="space-y-1">
-                  <Label htmlFor="phone" className="text-xs font-medium text-zinc-700">
+                  <Label
+                    htmlFor="phone"
+                    className="text-xs font-medium text-zinc-700"
+                  >
                     Contact Phone Number
                   </Label>
                   <div className="relative">
@@ -491,17 +516,24 @@ function ProfileContent() {
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                   </div>
                   {phoneError && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">{phoneError}</p>
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      {phoneError}
+                    </p>
                   )}
                 </div>
 
                 {/* Institutional Email (Read-Only) */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="email" className="text-xs font-medium text-zinc-700">
+                    <Label
+                      htmlFor="email"
+                      className="text-xs font-medium text-zinc-700"
+                    >
                       Institutional Email
                     </Label>
-                    <span className="text-[10px] text-zinc-400 italic">Read-only</span>
+                    <span className="text-[10px] text-zinc-400 italic">
+                      Read-only
+                    </span>
                   </div>
                   <div className="relative">
                     <Input
@@ -514,7 +546,8 @@ function ProfileContent() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1">
-                    Official email addresses are managed centrally by university administration.
+                    Official email addresses are managed centrally by university
+                    administration.
                   </p>
                 </div>
 
@@ -523,10 +556,15 @@ function ProfileContent() {
                 {role === "student" && (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="roll-no" className="text-xs font-medium text-zinc-700">
+                      <Label
+                        htmlFor="roll-no"
+                        className="text-xs font-medium text-zinc-700"
+                      >
                         Student Roll / Reg Number
                       </Label>
-                      <span className="text-[10px] text-zinc-400 italic">Institutional Record</span>
+                      <span className="text-[10px] text-zinc-400 italic">
+                        Institutional Record
+                      </span>
                     </div>
                     <div className="relative">
                       <Input
@@ -547,7 +585,10 @@ function ProfileContent() {
                 {/* 2. Faculty: Department (Editable) */}
                 {role === "faculty" && (
                   <div className="space-y-1">
-                    <Label htmlFor="department" className="text-xs font-medium text-zinc-700">
+                    <Label
+                      htmlFor="department"
+                      className="text-xs font-medium text-zinc-700"
+                    >
                       Academic Department
                     </Label>
                     <div className="relative">
@@ -564,7 +605,9 @@ function ProfileContent() {
                       <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                     </div>
                     {departmentError && (
-                      <p className="text-xs text-red-600 mt-1 font-medium">{departmentError}</p>
+                      <p className="text-xs text-red-600 mt-1 font-medium">
+                        {departmentError}
+                      </p>
                     )}
                   </div>
                 )}
@@ -573,10 +616,15 @@ function ProfileContent() {
                 {role === "admin" && (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="employee-id" className="text-xs font-medium text-zinc-700">
+                      <Label
+                        htmlFor="employee-id"
+                        className="text-xs font-medium text-zinc-700"
+                      >
                         Administrator Employee ID
                       </Label>
-                      <span className="text-[10px] text-zinc-400 italic">Institutional Record</span>
+                      <span className="text-[10px] text-zinc-400 italic">
+                        Institutional Record
+                      </span>
                     </div>
                     <div className="relative">
                       <Input
@@ -593,7 +641,6 @@ function ProfileContent() {
                     </p>
                   </div>
                 )}
-
               </div>
             </div>
 
@@ -609,10 +656,12 @@ function ProfileContent() {
               </div>
 
               <div className="space-y-4 max-w-md">
-
                 {/* Current Password */}
                 <div className="space-y-1">
-                  <Label htmlFor="curr-pass" className="text-xs font-medium text-zinc-700">
+                  <Label
+                    htmlFor="curr-pass"
+                    className="text-xs font-medium text-zinc-700"
+                  >
                     Current Password
                   </Label>
                   <div className="relative">
@@ -630,20 +679,31 @@ function ProfileContent() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                     <button
                       type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      onClick={() =>
+                        setShowCurrentPassword(!showCurrentPassword)
+                      }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
                     >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showCurrentPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                   {currentPasswordError && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">{currentPasswordError}</p>
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      {currentPasswordError}
+                    </p>
                   )}
                 </div>
 
                 {/* New Password */}
                 <div className="space-y-1">
-                  <Label htmlFor="new-pass" className="text-xs font-medium text-zinc-700">
+                  <Label
+                    htmlFor="new-pass"
+                    className="text-xs font-medium text-zinc-700"
+                  >
                     New Password
                   </Label>
                   <div className="relative">
@@ -664,17 +724,26 @@ function ProfileContent() {
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
                     >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showNewPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                   {newPasswordError && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">{newPasswordError}</p>
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      {newPasswordError}
+                    </p>
                   )}
                 </div>
 
                 {/* Confirm New Password */}
                 <div className="space-y-1">
-                  <Label htmlFor="confirm-new-pass" className="text-xs font-medium text-zinc-700">
+                  <Label
+                    htmlFor="confirm-new-pass"
+                    className="text-xs font-medium text-zinc-700"
+                  >
                     Confirm New Password
                   </Label>
                   <div className="relative">
@@ -692,10 +761,11 @@ function ProfileContent() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                   </div>
                   {confirmPasswordError && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">{confirmPasswordError}</p>
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      {confirmPasswordError}
+                    </p>
                   )}
                 </div>
-
               </div>
             </div>
 
@@ -719,9 +789,7 @@ function ProfileContent() {
                 </Button>
               </Link>
             </div>
-
           </form>
-
         </main>
       </div>
     </div>

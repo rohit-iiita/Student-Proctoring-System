@@ -23,8 +23,11 @@ export const welcomeUserEmailService = async ({
   const resend = resendClient;
 
   const { error } = await resend.emails.send({
-    from: "proctoring-system-demo@gmail.com",
-    to: email,
+    from: process.env.EMAIL_FROM!,
+    to:
+      process.env.NODE_ENV === "production"
+        ? email
+        : process.env.EMAIL_TEST_RECIPIENT!,
     subject: "Successfull Signup",
     react: createElement(WelcomeEmail, {
       email,
@@ -53,8 +56,11 @@ export const successfullComplaintRegistrationEmailService = async ({
   const resend = resendClient;
 
   const { error } = await resend.emails.send({
-    from: "proctoring-system-demo@gmail.com",
-    to: email,
+    from: process.env.EMAIL_FROM!,
+    to:
+      process.env.NODE_ENV === "production"
+        ? email
+        : process.env.EMAIL_TEST_RECIPIENT!,
     subject: `Complaint Registered - ${complaintId}`,
     react: createElement(SuccessfulComplaintRegisteredEmail, {
       name,
@@ -95,8 +101,11 @@ export const complaintMeetingCreationEmailService = async ({
   const resend = resendClient;
 
   const { error } = await resend.emails.send({
-    from: "proctoring-system-demo@gmail.com",
-    to: email,
+    from: process.env.EMAIL_FROM!,
+    to:
+      process.env.NODE_ENV === "production"
+        ? email
+        : process.env.EMAIL_TEST_RECIPIENT!,
     subject: `Meeting Scheduled - ${complaintId}`,
     react: createElement(ComplaintMeetingCreationEmail, {
       name,

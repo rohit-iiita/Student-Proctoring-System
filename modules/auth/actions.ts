@@ -22,40 +22,41 @@ export async function loginAction(input: TLoginInput) {
   if (!validation.success) {
     return {
       success: false,
-      message: "Invalid email or password format",
+      message: validation.error.issues[0]?.message || "Invalid email or password format",
     };
   }
 
   try {
     await loginUserService(validation.data);
+    const user = await getCurrentUserService();
 
     return {
       success: true,
       message: "Login successful",
+      role: user?.role || "student",
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Login error:", error);
+
+    const errorMessage =
+      error?.message?.includes("Invalid login credentials")
+        ? "Invalid email or password"
+        : error?.message || "Invalid email or password";
 
     return {
       success: false,
-      message: "Invalid email or password",
+      message: errorMessage,
     };
   }
 }
 
 export async function signupAction(input: TSignupInput) {
-  const currentUser = await getCurrentUserService();
-
-  if (currentUser) {
-    return { success: false, message: "Currently user logged in" };
-  }
-
   const validation = SIGNUP_SCHEMA.safeParse(input);
 
   if (!validation.success) {
     return {
       success: false,
-      message: "Please enter valid registration details",
+      message: validation.error.issues[0]?.message || "Please enter valid registration details",
     };
   }
 
@@ -75,14 +76,20 @@ export async function signupAction(input: TSignupInput) {
       success: true,
       message: userData.session
         ? "Account created successfully"
-        : "Account created. Please verify your email.",
+        : "Account created successfully. You can now sign in.",
+      role: validation.data.role,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signup error:", error);
+
+    const errorMessage =
+      error?.message?.includes("User already registered")
+        ? "This email is already registered."
+        : error?.message || "Unable to create account. Please try again.";
 
     return {
       success: false,
-      message: "Unable to create account. Please try again.",
+      message: errorMessage,
     };
   }
 }
@@ -109,11 +116,17 @@ export async function getCurrentUserAction() {
   try {
     const user = await getCurrentUserService();
 
+    if (!user) {
+      return {
+        success: false,
+        data: null,
+        message: "No authenticated user",
+      };
+    }
+
     return {
       success: true,
-      data: {
-        ...user,
-      },
+      data: user,
       message: "Fetched user's information successfully",
     };
   } catch (error) {
