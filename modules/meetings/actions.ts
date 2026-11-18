@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUserService } from "../auth/services";
 import { CREATE_MEETING_SCHEMA } from "./schemas";
-import { createComplaintMeetingService, getMyMeetingsService } from "./services";
+import {
+  createComplaintMeetingService,
+  getMyMeetingsService,
+} from "./services";
 import type { TMeetingListItem } from "./types";
 
 // ─── GET: Meetings for the signed-in user ────────────────────────────────────
@@ -43,7 +46,11 @@ export const createComplaintMeetingAction = async (input: {
   endsAt: string;
   location?: string;
   meetingUrl?: string;
-}): Promise<{ success: boolean; message?: string; data?: { meetingId: string } }> => {
+}): Promise<{
+  success: boolean;
+  message?: string;
+  data?: { meetingId: string };
+}> => {
   try {
     const currentUser = await getCurrentUserService();
 

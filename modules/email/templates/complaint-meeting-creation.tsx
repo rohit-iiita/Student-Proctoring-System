@@ -19,35 +19,31 @@ import type {
 import { formatInTimeZone } from "date-fns-tz";
 
 interface ComplaintMeetingCreationProps {
-  name: string;
   complaintId: string;
   meetingTitle: string;
+  meetingDate: string;
   startTime: string;
   endTime: string;
   location: string;
   meeting_url: string | null;
-  recipientRole: TComplaintMeetingRecipientRole;
   complaintCategory: TComplaintCategory;
 }
 
 export default function ComplaintMeetingCreationEmail({
-  name = "Rohit Mondal",
   complaintId = "CMP-1024",
   meetingTitle = "Complaint Discussion Meeting",
+  meetingDate,
   startTime,
   endTime,
   location = "Conference Room 1, IIIT Allahabad",
   complaintCategory = "discrimination_and_misconduct",
-  meeting_url = "https://google-meet.com",
-  recipientRole = "against",
+  meeting_url,
 }: ComplaintMeetingCreationProps) {
   const complaintTitle = formatComplaintCategory(complaintCategory);
 
-  const meetingDate = formatInTimeZone(
-    startTime,
-    "Asia/Kolkata",
-    "dd MMM yyyy",
-  );
+  const meetingDateLabel = meetingDate
+    ? meetingDate
+    : formatInTimeZone(startTime, "Asia/Kolkata", "dd MMM yyyy");
 
   return (
     <Html lang="en">
@@ -74,14 +70,10 @@ export default function ComplaintMeetingCreationEmail({
               Complaint Meeting Scheduled
             </Heading>
 
-            <Text className="text-base text-gray-700">Hello Mr. {name},</Text>
-
             <Text className="text-sm leading-6">
-              {recipientRole === "admin"
-                ? `${complaintTitle} meeting scheduled.`
-                : recipientRole === "against"
-                  ? "A meeting has been scheduled to discuss a COMPLAINT AGAINT YOU with AUTHORITIES. Please find the meeting details below and make sure to attend at the scheduled time. Please note that it is important to be present at that meeting."
-                  : "A meeting has been scheduled to discuss YOUR COMPLAINT with AUTHORITIES. Please find the meeting details below and make sure to attend at the scheduled time. Please note that it is important to be present at the meeting. Also BRING ANY EVIDENCE supporting your complaint"}
+              A meeting has been scheduled regarding a complaint assigned for
+              investigation. Please find the meeting details below and make sure
+              to attend at the scheduled time.
             </Text>
 
             {/* Meeting details */}
@@ -99,7 +91,7 @@ export default function ComplaintMeetingCreationEmail({
               </Text>
 
               <Text className="text-sm text-gray-600">
-                <strong>Date:</strong> {meetingDate}
+                <strong>Date:</strong> {meetingDateLabel}
               </Text>
 
               <Text className="text-sm text-gray-600">

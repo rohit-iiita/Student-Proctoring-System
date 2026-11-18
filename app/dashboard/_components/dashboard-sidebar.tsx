@@ -23,7 +23,11 @@ interface DashboardSidebarProps {
   onLogout: () => void;
 }
 
-export function DashboardSidebar({ user, role, onLogout }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  user,
+  role,
+  onLogout,
+}: DashboardSidebarProps) {
   const [unreadCount, setUnreadCount] = React.useState<number>(0);
 
   React.useEffect(() => {

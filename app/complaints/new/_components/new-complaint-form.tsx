@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { TUser } from "@/modules/auth/types";
+import type { TStudentOption } from "@/modules/complaints/types";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -22,7 +23,6 @@ import {
   LogOut,
   ArrowLeft,
   CheckCircle2,
-  Users,
   AlertTriangle,
   Upload,
   X,
@@ -30,6 +30,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { logoutAction } from "@/modules/auth/actions";
+import { RespondentPicker } from "./respondent-picker";
 
 interface SubmittedComplaint {
   id: string;
@@ -38,9 +39,10 @@ interface SubmittedComplaint {
 
 interface NewComplaintFormProps {
   user: TUser;
+  studentOptions: TStudentOption[];
 }
 
-export function NewComplaintForm({ user }: NewComplaintFormProps) {
+export function NewComplaintForm({ user, studentOptions }: NewComplaintFormProps) {
   const router = useRouter();
 
   const currentUser = {
@@ -53,7 +55,7 @@ export function NewComplaintForm({ user }: NewComplaintFormProps) {
   const [category, setCategory] = React.useState("");
   const [subject, setSubject] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [respondents, setRespondents] = React.useState("");
+  const [respondentIds, setRespondentIds] = React.useState<string[]>([]);
 
   // Attachments state: file metadata for the picker + raw files for upload
   const [attachments, setAttachments] = React.useState<
@@ -171,9 +173,7 @@ export function NewComplaintForm({ user }: NewComplaintFormProps) {
       formData.append("category", category.trim());
       formData.append("subject", subject.trim());
       formData.append("description", description.trim());
-      if (respondents.trim()) {
-        formData.append("respondents", respondents.trim());
-      }
+      respondentIds.forEach((id) => formData.append("respondentIds", id));
 
       fileObjects.forEach((file) => {
         formData.append("files", file);
@@ -387,7 +387,7 @@ export function NewComplaintForm({ user }: NewComplaintFormProps) {
               </div>
 
               <div className="flex items-center justify-center gap-3 pt-4">
-                <Link href={`/complaints/${submittedComplaint.id}?role=student`}>
+                <Link href={`/complaints/${submittedComplaint.refNumber}?role=student`}>
                   <Button className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium">
                     View Complaint Details
                   </Button>
@@ -504,31 +504,12 @@ export function NewComplaintForm({ user }: NewComplaintFormProps) {
                   )}
                 </div>
 
-                {/* Optional Respondents Field */}
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="respondents"
-                    className="text-xs font-medium text-zinc-700"
-                  >
-                    Respondent Name(s){" "}
-                    <span className="text-zinc-400 font-normal">(Optional)</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="respondents"
-                      type="text"
-                      placeholder="e.g. Person, room number, or cafeteria vendor involved"
-                      value={respondents}
-                      onChange={(e) => setRespondents(e.target.value)}
-                      className="pl-9 text-xs"
-                    />
-                    <Users className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">
-                    Leave blank if this is a general facility or infrastructure
-                    complaint.
-                  </p>
-                </div>
+                {/* Respondents: searchable student multi-select */}
+                <RespondentPicker
+                  studentOptions={studentOptions}
+                  selectedIds={respondentIds}
+                  onChange={setRespondentIds}
+                />
 
                 {/* Multi-File Attachment Picker */}
                 <div className="space-y-2 pt-1">

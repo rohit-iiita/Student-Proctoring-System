@@ -20,11 +20,6 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
     initialData.activeRole,
   );
 
-  const handleRoleChange = (newRole: TDashboardRole) => {
-    setRole(newRole);
-    router.push(`/dashboard?role=${newRole}`);
-  };
-
   const handleLogout = async () => {
     try {
       await logoutAction();

@@ -1,16 +1,21 @@
 import "server-only";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { createSupabaseClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createNotificationService } from "@/modules/notifications/services";
+import { successfullComplaintRegistrationEmailService } from "@/modules/email/services";
+import { formatComplaintCategory } from "@/lib/utils";
 import type {
   TComplaintCategory,
   TComplaintListItem,
   TComplaintDetail,
   TComplaintStatus,
   TFacultyOption,
+  TStudentOption,
+  TResolutionCertificate,
 } from "./types";
 
 // Helper: Generate a random 9-character reference (matching DB function without prefix)
@@ -54,14 +59,14 @@ export const createComplaintService = async ({
   category,
   description,
   subject,
-  respondents,
+  respondentIds = [],
   attachments = [],
 }: {
   studentId: string;
   category: string;
   subject: string;
   description: string;
-  respondents?: string;
+  respondentIds?: string[];
   attachments?: AttachmentUploadItem[];
 }) => {
   const supabase = await createSupabaseClient();
@@ -104,25 +109,36 @@ export const createComplaintService = async ({
     throw insertError;
   }
 
-  // 3. Handle optional respondents
-  if (respondents && respondents.trim()) {
+  // 3. Link the selected student respondents to the complaint.
+  //    Only IDs that actually exist in `students` are inserted, so a stale or
+  //    invalid selection can never violate the foreign key constraint.
+  if (respondentIds.length > 0) {
     try {
-      const respTerm = respondents.trim();
-      // Try to find student respondent by enrollment_no or name
-      const { data: foundRespondent } = await supabase
+      const uniqueIds = Array.from(new Set(respondentIds));
+
+      const { data: validRespondents, error: respondentsError } = await supabase
         .from("students")
         .select("id")
-        .eq("enrollment_no", respTerm)
-        .maybeSingle();
+        .in("id", uniqueIds);
 
-      if (foundRespondent?.id) {
-        await supabase.from("complaint_respondents").insert({
+      if (respondentsError) throw respondentsError;
+
+      const rowsToInsert = (validRespondents ?? [])
+        .filter((row) => typeof row.id === "string")
+        .map((row) => ({
           complaint_id: complaint.id,
-          student_id: foundRespondent.id,
-        });
+          student_id: row.id,
+        }));
+
+      if (rowsToInsert.length > 0) {
+        const { error: insertRespondentsError } = await supabase
+          .from("complaint_respondents")
+          .insert(rowsToInsert);
+
+        if (insertRespondentsError) throw insertRespondentsError;
       }
     } catch (respErr) {
-      console.warn("Could not link respondent to complaint:", respErr);
+      console.warn("Could not link respondents to complaint:", respErr);
     }
   }
 
@@ -146,17 +162,8 @@ export const createComplaintService = async ({
         if (uploadError) {
           console.error(`Error uploading ${file.name} to storage:`, uploadError);
         } else {
-          // Explicitly ensure complaint_attachments row is present
-          await createSupabaseAdminClient
-            .from("complaint_attachments")
-            .insert({
-              complaint_id: complaint.id,
-              uploaded_by: studentId,
-              file_path: storagePath,
-              file_type: file.type || "application/octet-stream",
-              file_size: file.size,
-            });
-
+          // The trg_storage_complaint_attachment trigger on storage.objects
+          // inserts the complaint_attachments row; do not insert it again here.
           uploadedFiles.push({
             name: file.name,
             size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -192,6 +199,72 @@ export const createComplaintService = async ({
   } catch (notifErr) {
     console.warn("Could not send admin notifications for new complaint:", notifErr);
   }
+
+  // 6. Send registration confirmation emails to the student and all admins
+  //    after the response is sent. Failures are logged, never fail the
+  //    complaint creation.
+  after(async () => {
+    try {
+      const [studentResult, adminsResult] = await Promise.all([
+        createSupabaseAdminClient
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", studentId)
+          .maybeSingle(),
+        createSupabaseAdminClient
+          .from("profiles")
+          .select("full_name, email")
+          .eq("role", "admin"),
+      ]);
+
+      if (studentResult.error) throw studentResult.error;
+      if (adminsResult.error) throw adminsResult.error;
+
+      const studentProfile = studentResult.data;
+      const admins = adminsResult.data ?? [];
+
+      const recipients = [
+        ...(studentProfile?.email
+          ? [
+              {
+                name: studentProfile.full_name,
+                email: studentProfile.email,
+              },
+            ]
+          : []),
+        ...admins
+          .filter((admin) => admin.email)
+          .map((admin) => ({ name: admin.full_name, email: admin.email })),
+      ];
+
+      const results = await Promise.allSettled(
+        recipients.map((recipient) =>
+          successfullComplaintRegistrationEmailService({
+            email: recipient.email,
+            name: recipient.name,
+            complaintId: complaint.reference_id,
+            category: formatComplaintCategory(dbCategory),
+            subject: complaint.subject,
+            submittedAt: new Date(complaint.created_at).toLocaleString(
+              "en-IN",
+              { dateStyle: "medium", timeStyle: "short" },
+            ),
+          }),
+        ),
+      );
+
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.warn("Complaint registration email failed:", result.reason);
+        }
+      }
+    } catch (emailErr) {
+      console.warn(
+        "Could not send complaint registration emails:",
+        emailErr,
+      );
+    }
+  });
 
   return {
     ...complaint,
@@ -324,6 +397,39 @@ export const getFacultyListService = async (): Promise<TFacultyOption[]> => {
   });
 };
 
+// ─── READ: Student directory for the respondent multi-select picker ──────────
+
+export const getStudentOptionsService = async (): Promise<TStudentOption[]> => {
+  const supabase = await createSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("students")
+    .select(
+      `id,
+       enrollment_no,
+       profile:profiles!students_id_fkey(full_name)`,
+    )
+    .order("enrollment_no", { ascending: true, nullsFirst: false });
+
+  if (error) {
+    console.error("getStudentOptionsService error:", error);
+    throw error;
+  }
+
+  return (data ?? []).map((row) => {
+    const student = row as unknown as {
+      id: string;
+      enrollment_no: string | null;
+      profile: { full_name: string } | null;
+    };
+    return {
+      id: student.id,
+      fullName: student.profile?.full_name ?? "Unknown Student",
+      enrollmentNo: student.enrollment_no ?? null,
+    };
+  });
+};
+
 // ─── UPDATE: Assign faculty (admin) ──────────────────────────────────────────
 
 export const assignComplaintService = async ({
@@ -384,8 +490,8 @@ export const assignComplaintService = async ({
 
 // ─── READ: Single complaint detail ───────────────────────────────────────────
 
-export const getComplaintByIdService = async (
-  complaintId: string
+export const getComplaintByReferenceIdService = async (
+  complaintRefId: string
 ): Promise<TComplaintDetail | null> => {
   const supabase = await createSupabaseClient();
 
@@ -407,9 +513,16 @@ export const getComplaintByIdService = async (
        assigned:faculty!complaints_assigned_to_fkey(
          profile:profiles!faculty_id_fkey(full_name)
        ),
-       complaint_attachments(id, file_path, file_type, file_size)`
+        complaint_respondents(
+          student:students!complaint_respondents_student_id_fkey(
+            id,
+            enrollment_no,
+            profile:profiles!students_id_fkey(full_name)
+          )
+        ),
+        complaint_attachments(id, file_path, file_type, file_size)`
     )
-    .eq("id", complaintId)
+    .eq("reference_id", complaintRefId)
     .maybeSingle();
 
   if (error) {
@@ -431,6 +544,15 @@ export const getComplaintByIdService = async (
     created_at: string;
     student: { profile: { full_name: string } | null } | null;
     assigned: { profile: { full_name: string } | null } | null;
+    complaint_respondents:
+      | Array<{
+          student: {
+            id: string;
+            enrollment_no: string | null;
+            profile: { full_name: string } | null;
+          } | null;
+        }>
+      | null;
     complaint_attachments:
       | Array<{
           id: string;
@@ -453,11 +575,64 @@ export const getComplaintByIdService = async (
     createdAt: row.created_at,
     studentName: row.student?.profile?.full_name ?? null,
     assignedFacultyName: row.assigned?.profile?.full_name ?? null,
+    respondents: (row.complaint_respondents ?? [])
+      .map((resp) =>
+        resp.student
+          ? {
+              id: resp.student.id,
+              fullName: resp.student.profile?.full_name ?? "Unknown Student",
+              enrollmentNo: resp.student.enrollment_no ?? null,
+            }
+          : null,
+      )
+      .filter((r): r is { id: string; fullName: string; enrollmentNo: string | null } => r !== null),
     attachments: (row.complaint_attachments ?? []).map((a) => ({
       id: a.id,
       filePath: a.file_path,
       fileType: a.file_type,
       fileSize: a.file_size,
+      fileUrl: supabase.storage
+        .from("complaint-attachments")
+        .getPublicUrl(a.file_path).data.publicUrl,
     })),
+  };
+};
+
+// ─── READ: Signed resolution certificate ─────────────────────────────────────
+
+export const getResolutionCertificateService = async (
+  complaintId: string
+): Promise<TResolutionCertificate | null> => {
+  const supabase = await createSupabaseClient();
+
+  // list() is RLS-filtered by resolution_certificates_select_participant, so a
+  // participant sees their certificate and everyone else sees an empty folder.
+  const { data: objects, error } = await supabase.storage
+    .from("resolution-certificates")
+    .list(complaintId, { limit: 1, search: "resolution-certificate-" });
+
+  if (error) {
+    console.error("getResolutionCertificateService list error:", error);
+    return null;
+  }
+
+  const certificate = (objects ?? []).find((obj) =>
+    obj.name.startsWith("resolution-certificate-"),
+  );
+  if (!certificate) return null;
+
+  const filePath = `${complaintId}/${certificate.name}`;
+  const { data: signed, error: signError } = await supabase.storage
+    .from("resolution-certificates")
+    .createSignedUrl(filePath, 60 * 60);
+
+  if (signError || !signed) {
+    console.error("getResolutionCertificateService sign error:", signError);
+    return null;
+  }
+
+  return {
+    fileName: certificate.name,
+    url: signed.signedUrl,
   };
 };

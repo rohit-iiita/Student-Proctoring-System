@@ -62,8 +62,8 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-zinc-600 mt-4 max-w-2xl leading-relaxed">
-            A single platform for student complaints, meetings, notifications
-            and online exam proctoring.
+            A single platform for student complaints, meetings and
+            notifications.
           </p>
 
           {/* Call to Action Buttons */}
@@ -98,7 +98,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Feature 1 */}
               <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 space-y-3 hover:border-zinc-300 transition-colors">
                 <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
@@ -139,21 +139,6 @@ export default function LandingPage() {
                 <p className="text-xs text-zinc-600 leading-relaxed">
                   Instant in-app alerts and email notifications for complaint
                   assignments, status updates, and meeting invitations.
-                </p>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 space-y-3 hover:border-zinc-300 transition-colors">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <VideoIcon className="w-5 h-5" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900">
-                  Online Exam Proctoring
-                </h3>
-                <p className="text-xs text-zinc-600 leading-relaxed">
-                  Automated suspicious activity detection (tab switching,
-                  multi-face, and gaze tracking) with comprehensive faculty
-                  review logs.
                 </p>
               </div>
             </div>
@@ -242,8 +227,8 @@ export default function LandingPage() {
                   <h3 className="text-sm font-bold text-zinc-900">Student</h3>
                 </div>
                 <p className="text-xs text-zinc-600 leading-relaxed">
-                  Raise grievances, track status updates, RSVP to hearing
-                  invitations, and take proctored online exams.
+                  Raise grievances, track status updates and RSVP to hearing
+                  invitations.
                 </p>
               </div>
 
@@ -256,8 +241,8 @@ export default function LandingPage() {
                   <h3 className="text-sm font-bold text-zinc-900">Faculty</h3>
                 </div>
                 <p className="text-xs text-zinc-600 leading-relaxed">
-                  Investigate assigned complaints, add internal notes, schedule
-                  inquiry meetings, and review exam proctoring logs.
+                  Investigate assigned complaints, add internal notes and
+                  schedule inquiry meetings.
                 </p>
               </div>
 

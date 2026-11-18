@@ -15,8 +15,7 @@ export const COMPLAINT_REGISTRATION_EMAIL_SCHEMA = z.object({
 });
 
 export const COMPLAINT_MEETING_EMAIL_SCHEMA = z.object({
-  email: z.email(),
-  name: z.string().min(1),
+  email: z.array(z.email()),
   complaintId: z.string().min(1),
   meetingTitle: z.string().min(1),
   startTime: z.date(),
@@ -24,5 +23,4 @@ export const COMPLAINT_MEETING_EMAIL_SCHEMA = z.object({
   location: z.string().min(1),
   complaintCategory: z.string().min(1),
   meeting_url: z.string().url().nullable(),
-  recipientRole: z.enum(["favour", "against", "admin"]),
 });

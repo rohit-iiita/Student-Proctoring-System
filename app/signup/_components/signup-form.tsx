@@ -419,8 +419,8 @@ export function SignupForm() {
                   htmlFor="terms"
                   className="text-xs leading-relaxed font-normal text-zinc-600 cursor-pointer"
                 >
-                  I agree to the online exam proctoring guidelines and campus
-                  complaint management code of conduct.
+                  I agree to the guidelines and campus complaint management code
+                  of conduct.
                 </Label>
               </div>
               {termsError && (
