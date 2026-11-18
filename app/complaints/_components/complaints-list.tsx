@@ -406,7 +406,7 @@ export default function ComplaintsList({
                           {formatDate(item.createdAt)}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <Link href={`/complaints/${item.id}`}>
+                          <Link href={`/complaints/${item.referenceId}`}>
                             <Button
                               variant="outline"
                               size="sm"

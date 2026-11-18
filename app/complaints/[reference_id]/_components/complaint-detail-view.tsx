@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,17 +22,26 @@ import {
   CheckCheck,
   MessageSquare,
   AlertCircle,
+  FileDown,
   FileIcon,
   ImageIcon,
   CalendarPlus,
+  Users,
+  UserRound,
 } from "lucide-react";
-import type { TComplaintDetail, TComplaintStatus, TFacultyOption } from "@/modules/complaints/types";
+import type {
+  TComplaintDetail,
+  TComplaintStatus,
+  TFacultyOption,
+  TResolutionCertificate,
+} from "@/modules/complaints/types";
 import type { TUserRole } from "@/modules/auth/types";
 import {
   assignComplaintAction,
   updateComplaintAction,
 } from "@/modules/complaints/actions";
 import { createComplaintMeetingAction } from "@/modules/meetings/actions";
+import { ResolveSignatureDialog } from "./resolve-signature-dialog";
 
 interface ComplaintDetailViewProps {
   complaint: TComplaintDetail | null;
@@ -39,6 +49,7 @@ interface ComplaintDetailViewProps {
   userName: string;
   userEmail: string;
   facultyOptions: TFacultyOption[];
+  certificate: TResolutionCertificate | null;
 }
 
 function formatCategory(cat: string): string {
@@ -115,12 +126,13 @@ export default function ComplaintDetailView({
   userName,
   userEmail,
   facultyOptions,
+  certificate,
 }: ComplaintDetailViewProps) {
   const router = useRouter();
 
   // Admin Assignment State
   const [selectedFaculty, setSelectedFaculty] = React.useState<string>(
-    facultyOptions[0]?.id ?? ""
+    facultyOptions[0]?.id ?? "",
   );
   const [isAssigning, setIsAssigning] = React.useState(false);
   const [assignMessage, setAssignMessage] = React.useState("");
@@ -132,14 +144,18 @@ export default function ComplaintDetailView({
       ? complaint.status === "submitted"
         ? "under_review"
         : complaint.status
-      : "under_review"
+      : "under_review",
   );
   const [reviewNotes, setReviewNotes] = React.useState(
-    complaint?.resolution ?? ""
+    complaint?.resolution ?? "",
   );
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [updateMessage, setUpdateMessage] = React.useState("");
   const [updateError, setUpdateError] = React.useState(false);
+
+  // Admin: Resolve-with-signature dialog state
+  const [isResolveSignatureOpen, setIsResolveSignatureOpen] =
+    React.useState(false);
 
   // Admin: Schedule Meeting State
   const [meetingTitle, setMeetingTitle] = React.useState("");
@@ -171,7 +187,7 @@ export default function ComplaintDetailView({
 
     if (response.success) {
       setAssignMessage(
-        `${response.message ?? "Complaint assigned successfully."}`
+        `${response.message ?? "Complaint assigned successfully."}`,
       );
       router.refresh();
     } else {
@@ -186,8 +202,18 @@ export default function ComplaintDetailView({
     e.preventDefault();
     if (!complaint) return;
 
+    // Admin resolving a complaint must complete the signature flow first —
+    // the actual update happens from the resolve-signature dialog.
+    if (userRole === "admin" && reviewStatus === "resolved") {
+      setUpdateMessage("");
+      setUpdateError(false);
+      setIsResolveSignatureOpen(true);
+      return;
+    }
+
     setUpdateMessage("");
     setUpdateError(false);
+    setIsUpdating(true);
 
     const response = await updateComplaintAction({
       complaintId: complaint.id,
@@ -203,6 +229,28 @@ export default function ComplaintDetailView({
       setUpdateMessage(response.message ?? "Failed to update complaint.");
     }
     setIsUpdating(false);
+  };
+
+  // Admin: persist the resolution from the signature dialog, then refresh
+  const handleResolveSignatureConfirm = async () => {
+    if (!complaint) return { success: false, message: "Complaint not found." };
+
+    const response = await updateComplaintAction({
+      complaintId: complaint.id,
+      status: "resolved",
+      resolution: reviewNotes.trim() || null,
+    });
+
+    if (response.success) {
+      setUpdateError(false);
+      setUpdateMessage(response.message ?? "Complaint resolved successfully.");
+      router.refresh();
+    } else {
+      setUpdateError(true);
+      setUpdateMessage(response.message ?? "Failed to update complaint.");
+    }
+
+    return response;
   };
 
   // Admin: schedule a meeting for this complaint
@@ -432,7 +480,9 @@ export default function ComplaintDetailView({
                   ) : (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   )}
-                  <span>{assignMessage || updateMessage || meetingMessage}</span>
+                  <span>
+                    {assignMessage || updateMessage || meetingMessage}
+                  </span>
                 </div>
               )}
 
@@ -505,6 +555,39 @@ export default function ComplaintDetailView({
                   </div>
                 </div>
 
+                {/* Respondents Section */}
+                <div className="pt-2">
+                  <span className="text-xs font-semibold text-zinc-700 block mb-1.5 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-zinc-500" />
+                    Complaint Filed Against
+                  </span>
+
+                  {complaint.respondents.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {complaint.respondents.map((respondent) => (
+                        <span
+                          key={respondent.id}
+                          className="inline-flex items-center gap-1.5 pl-2.5 pr-2.5 py-1.5 rounded-full bg-zinc-50 border border-zinc-200 text-xs"
+                        >
+                          <UserRound className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="font-semibold text-zinc-800">
+                            {respondent.fullName}
+                          </span>
+                          {respondent.enrollmentNo && (
+                            <span className="font-mono text-[10px] text-zinc-500 bg-white border border-zinc-200 px-1.5 py-0.5 rounded-md">
+                              {respondent.enrollmentNo}
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-400 italic">
+                      No student respondents were named in this complaint.
+                    </div>
+                  )}
+                </div>
+
                 {/* Attachments Section */}
                 <div className="pt-2">
                   <span className="text-xs font-semibold text-zinc-700 block mb-1.5 flex items-center gap-1.5">
@@ -518,9 +601,13 @@ export default function ComplaintDetailView({
                         const name = fileNameFromPath(att.filePath);
                         const isPdf = name.toLowerCase().endsWith(".pdf");
                         return (
-                          <div
+                          <a
                             key={att.id}
-                            className="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
+                            href={att.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs hover:bg-zinc-100 hover:border-zinc-300 transition-colors cursor-pointer"
+                            title={`Open ${name}`}
                           >
                             <div className="flex items-center gap-2 truncate pr-2">
                               {isPdf ? (
@@ -535,7 +622,7 @@ export default function ComplaintDetailView({
                             <span className="text-[10px] text-zinc-500 bg-white border border-zinc-200 px-2 py-0.5 rounded-md font-mono shrink-0">
                               {formatBytes(att.fileSize)}
                             </span>
-                          </div>
+                          </a>
                         );
                       })}
                     </div>
@@ -558,6 +645,24 @@ export default function ComplaintDetailView({
                     </div>
                   </div>
                 )}
+
+                {/* Signed resolution certificate (student, assigned faculty & admins) */}
+                {complaint.status === "resolved" && certificate && (
+                  <a
+                    href={certificate.url}
+                    download={certificate.fileName}
+                    className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs group hover:bg-emerald-100 transition-colors"
+                  >
+                    <span className="flex items-center gap-2 font-semibold text-emerald-800">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      Signed resolution certificate
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-medium shrink-0 group-hover:underline">
+                      <FileDown className="w-4 h-4" />
+                      Download PDF
+                    </span>
+                  </a>
+                )}
               </div>
 
               {/* ================= ROLE-BASED ACTION PANELS ================= */}
@@ -574,11 +679,14 @@ export default function ComplaintDetailView({
 
                   {facultyOptions.length === 0 ? (
                     <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-400 italic">
-                      No faculty members are registered yet. Add faculty accounts
-                      before assigning complaints.
+                      No faculty members are registered yet. Add faculty
+                      accounts before assigning complaints.
                     </div>
                   ) : (
-                    <form onSubmit={handleAdminAssign} className="space-y-4 max-w-md">
+                    <form
+                      onSubmit={handleAdminAssign}
+                      className="space-y-4 max-w-md"
+                    >
                       <div className="space-y-1.5">
                         <Label
                           htmlFor="assign-faculty"
@@ -605,7 +713,9 @@ export default function ComplaintDetailView({
                         disabled={isAssigning}
                         className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-5 py-2 rounded-xl"
                       >
-                        {isAssigning ? "Saving Assignment..." : "Save Faculty Assignment"}
+                        {isAssigning
+                          ? "Saving Assignment..."
+                          : "Save Faculty Assignment"}
                       </Button>
                     </form>
                   )}
@@ -622,13 +732,17 @@ export default function ComplaintDetailView({
                     </h3>
                   </div>
 
-                  {complaint.status === "resolved" || complaint.status === "rejected" ? (
+                  {complaint.status === "resolved" ||
+                  complaint.status === "rejected" ? (
                     <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-400 italic">
                       This complaint is {complaint.status}. Meetings can only be
                       scheduled for open complaints.
                     </div>
                   ) : (
-                    <form onSubmit={handleScheduleMeeting} className="space-y-4 max-w-lg">
+                    <form
+                      onSubmit={handleScheduleMeeting}
+                      className="space-y-4 max-w-lg"
+                    >
                       <div className="space-y-1.5">
                         <Label
                           htmlFor="meeting-title"
@@ -661,7 +775,9 @@ export default function ComplaintDetailView({
                           rows={3}
                           placeholder="What will be discussed in this meeting..."
                           value={meetingDescription}
-                          onChange={(e) => setMeetingDescription(e.target.value)}
+                          onChange={(e) =>
+                            setMeetingDescription(e.target.value)
+                          }
                           maxLength={1000}
                           className="w-full rounded-lg border border-input bg-transparent p-3 text-xs text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-400"
                         />
@@ -696,7 +812,9 @@ export default function ComplaintDetailView({
                             id="meeting-start"
                             type="time"
                             value={meetingStartTime}
-                            onChange={(e) => setMeetingStartTime(e.target.value)}
+                            onChange={(e) =>
+                              setMeetingStartTime(e.target.value)
+                            }
                             required
                             className="text-xs"
                           />
@@ -779,17 +897,22 @@ export default function ComplaintDetailView({
                 </div>
               )}
 
-              {/* 3. FACULTY PANEL: Update Status & Resolution Notes */}
-              {userRole === "faculty" && (
+              {/* 3. FACULTY / ADMIN PANEL: Update Status & Resolution Notes */}
+              {(userRole === "faculty" || userRole === "admin") && (
                 <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-xs space-y-4">
                   <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
                     <CheckCheck className="w-4 h-4 text-zinc-700" />
                     <h3 className="text-sm font-bold text-zinc-900">
-                      Faculty Investigation &amp; Resolution
+                      {userRole === "admin"
+                        ? "Administrative Action: Change Complaint Status"
+                        : "Faculty Investigation & Resolution"}
                     </h3>
                   </div>
 
-                  <form onSubmit={handleFacultyUpdate} className="space-y-4 max-w-lg">
+                  <form
+                    onSubmit={handleFacultyUpdate}
+                    className="space-y-4 max-w-lg"
+                  >
                     {/* Status Dropdown */}
                     <div className="space-y-1.5">
                       <Label
@@ -806,6 +929,7 @@ export default function ComplaintDetailView({
                         }
                         className="w-full h-9 rounded-lg border border-input bg-white px-3 text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-zinc-400 cursor-pointer"
                       >
+                        <option value="submitted">Submitted</option>
                         <option value="under_review">Under Review</option>
                         <option value="resolved">Resolved</option>
                         <option value="rejected">Rejected</option>
@@ -842,7 +966,9 @@ export default function ComplaintDetailView({
                       disabled={isUpdating}
                       className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-5 py-2 rounded-xl"
                     >
-                      {isUpdating ? "Updating Complaint..." : "Save Status & Notes"}
+                      {isUpdating
+                        ? "Updating Complaint..."
+                        : "Save Status & Notes"}
                     </Button>
                   </form>
                 </div>
@@ -850,21 +976,42 @@ export default function ComplaintDetailView({
 
               {/* 4. STUDENT VIEW: Read-Only message */}
               {userRole === "student" && (
-                <div className="p-4 bg-zinc-100 rounded-xl text-xs text-zinc-600 flex items-center justify-between gap-3">
-                  <span>
-                    This complaint is under review by campus administration. You
-                    will be notified when the assigned faculty updates this case.
-                  </span>
-                  <Link href="/complaints">
-                    <Button variant="outline" size="sm" className="text-xs shrink-0">
-                      Back to Complaints
-                    </Button>
-                  </Link>
+                <div className="space-y-3">
+                  {complaint?.status === "resolved" && certificate && (
+                    <a
+                      href={certificate.url}
+                      download={certificate.fileName}
+                      className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs group hover:bg-emerald-100 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 font-semibold text-emerald-800">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        Your grievance has been resolved — the signed resolution
+                        certificate is ready.
+                      </span>
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-medium shrink-0 group-hover:underline">
+                        <FileDown className="w-4 h-4" />
+                        Download Certificate
+                      </span>
+                    </a>
+                  )}
                 </div>
               )}
             </>
           )}
         </main>
+
+        {/* Admin: resolve-with-signature flow (signature stays client-side) */}
+        {complaint && userRole === "admin" && (
+          <ResolveSignatureDialog
+            complaint={complaint}
+            authority={{ name: userName, email: userEmail, role: "admin" }}
+            status={reviewStatus}
+            resolution={reviewNotes}
+            open={isResolveSignatureOpen}
+            onOpenChange={setIsResolveSignatureOpen}
+            onConfirm={handleResolveSignatureConfirm}
+          />
+        )}
       </div>
     </div>
   );

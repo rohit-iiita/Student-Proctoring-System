@@ -1,30 +1,39 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getCurrentUserService } from "@/modules/auth/services";
+import { getFacultyAction } from "@/modules/admin/actions";
+import FacultyList from "./_components/faculty-list";
 
-import * as React from "react";
-import Link from "next/link";
-import { Briefcase, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+export const metadata = {
+  title: "Manage Faculty - Student Proctoring System",
+  description:
+    "View the faculty roster with departments, designations, and account status.",
+};
 
-export default function AdminFacultyPlaceholderPage() {
+// Auth-gated: reads cookies() per request; opt out of prerendering
+export const instant = false;
+
+export default async function AdminFacultyPage() {
+  const user = await getCurrentUserService();
+
+  // If not logged in, redirect to the sign-in page
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Admin-only module: everyone else goes back to their dashboard
+  if (user.role !== "admin") {
+    redirect(`/dashboard?role=${user.role}`);
+  }
+
+  // Fetch the faculty roster from the database
+  const response = await getFacultyAction();
+
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white border border-zinc-200 rounded-2xl p-8 text-center shadow-xs">
-        <div className="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center mx-auto mb-4">
-          <Briefcase className="w-6 h-6" />
-        </div>
-        <h1 className="text-xl font-bold text-zinc-900">Manage Faculty</h1>
-        <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
-          This admin module is part of our step-by-step build plan and will be implemented in <strong>Step (f)</strong> (view faculty roster, department, and assigned complaints).
-        </p>
-        <div className="mt-6">
-          <Link href="/dashboard?role=admin">
-            <Button variant="outline" className="w-full text-xs font-medium">
-              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </div>
+    <FacultyList
+      faculty={response.data ?? []}
+      userName={user.fullName}
+      userEmail={user.email ?? ""}
+      idNumber={user.idNumber ?? null}
+    />
   );
 }

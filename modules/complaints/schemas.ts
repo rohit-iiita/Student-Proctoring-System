@@ -38,5 +38,15 @@ export const CREATE_COMPLAINT_SCHEMA = z.object({
   category: COMPLAINT_CATEGORY_SCHEMA,
   subject: z.string().min(5, "Subject must be at least 5 characters"),
   description: z.string().min(20, "Description must be at least 20 characters"),
-  respondents: z.string().optional(),
+  respondentIds: z
+    .array(z.string().uuid("Select a valid student respondent."))
+    .max(20, "You can select up to 20 respondents per complaint.")
+    .optional(),
+});
+
+/** Minimal student info used by the respondent multi-select picker */
+export const STUDENT_OPTION_SCHEMA = z.object({
+  id: z.string().uuid(),
+  fullName: z.string(),
+  enrollmentNo: z.string().nullable(),
 });

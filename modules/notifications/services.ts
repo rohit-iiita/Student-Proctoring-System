@@ -1,11 +1,16 @@
 import "server-only";
 
 import { createSupabaseClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { TNotification } from "./types";
 
 /**
  * Insert a single notification for one user.
  * Called from other modules' server-side flows (e.g. complaint creation).
+ *
+ * Uses the service-role client because notifications are system-generated on
+ * behalf of other users (e.g. an admin notifying complaint participants), and
+ * the notifications table intentionally has no INSERT policy under RLS.
  */
 export const createNotificationService = async ({
   userId,
@@ -20,7 +25,7 @@ export const createNotificationService = async ({
   notificationType?: "complaint" | "meeting" | "exam" | "system";
   metadata?: Record<string, unknown>;
 }): Promise<void> => {
-  const supabase = await createSupabaseClient();
+  const supabase = createSupabaseAdminClient;
 
   const { error } = await supabase.from("notifications").insert({
     user_id: userId,

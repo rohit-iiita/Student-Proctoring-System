@@ -5,10 +5,12 @@ import { getCurrentUserService } from "../auth/services";
 import {
   createComplaintService,
   getComplaintsService,
-  getComplaintByIdService,
+  getComplaintByReferenceIdService,
   getFacultyListService,
+  getStudentOptionsService,
   assignComplaintService,
   updateComplaintService,
+  getResolutionCertificateService,
   type AttachmentUploadItem,
 } from "./services";
 import { CREATE_COMPLAINT_SCHEMA } from "./schemas";
@@ -17,6 +19,8 @@ import type {
   TComplaintDetail,
   TFacultyOption,
   TComplaintStatus,
+  TStudentOption,
+  TResolutionCertificate,
 } from "./types";
 
 export const createComplaintAction = async (formData: FormData) => {
@@ -32,13 +36,24 @@ export const createComplaintAction = async (formData: FormData) => {
   const category = (formData.get("category") as string) || "";
   const subject = (formData.get("subject") as string) || "";
   const description = (formData.get("description") as string) || "";
-  const respondents = (formData.get("respondents") as string) || "";
+  const respondentIds = formData
+    .getAll("respondentIds")
+    .filter(
+      (entry): entry is string => typeof entry === "string" && entry.length > 0,
+    );
+
+  if (respondentIds.includes(currentUser.userId)) {
+    return {
+      success: false,
+      message: "Student cannot be respondent of their own complaint",
+    };
+  }
 
   const validation = CREATE_COMPLAINT_SCHEMA.safeParse({
     category,
     subject,
     description,
-    respondents: respondents || undefined,
+    respondentIds: respondentIds.length > 0 ? respondentIds : undefined,
   });
 
   if (!validation.success) {
@@ -74,7 +89,7 @@ export const createComplaintAction = async (formData: FormData) => {
       category: validation.data.category,
       subject: validation.data.subject,
       description: validation.data.description,
-      respondents: validation.data.respondents,
+      respondentIds: validation.data.respondentIds,
       attachments,
     });
 
@@ -95,7 +110,6 @@ export const createComplaintAction = async (formData: FormData) => {
         status: created.status,
         assignedFaculty: "Unassigned",
         createdAt: new Date().toISOString().split("T")[0],
-        respondents: validation.data.respondents,
         attachments: created.attachments,
       },
     };
@@ -142,7 +156,7 @@ export const getComplaintsAction = async (): Promise<{
 
 // ─── GET: Single complaint detail ─────────────────────────────────────────────
 
-export const getComplaintByIdAction = async (
+export const getComplaintByReferenceIdAction = async (
   complaintId: string,
 ): Promise<{
   success: boolean;
@@ -155,7 +169,7 @@ export const getComplaintByIdAction = async (
       return { success: false, message: "Not authenticated." };
     }
 
-    const data = await getComplaintByIdService(complaintId);
+    const data = await getComplaintByReferenceIdService(complaintId);
     return { success: true, data };
   } catch (error) {
     console.error("getComplaintByIdAction error:", error);
@@ -194,6 +208,31 @@ export const getFacultyListAction = async (): Promise<{
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to load faculty list.",
+    };
+  }
+};
+
+// ─── GET: Student directory for the respondent picker ────────────────────────
+
+export const getStudentOptionsAction = async (): Promise<{
+  success: boolean;
+  data?: TStudentOption[];
+  message?: string;
+}> => {
+  try {
+    const currentUser = await getCurrentUserService();
+    if (!currentUser) {
+      return { success: false, message: "Not authenticated." };
+    }
+
+    const data = await getStudentOptionsService();
+    return { success: true, data };
+  } catch (error) {
+    console.error("getStudentOptionsAction error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load student list.",
     };
   }
 };
@@ -291,6 +330,35 @@ export const updateComplaintAction = async ({
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to update complaint.",
+    };
+  }
+};
+
+// ─── GET: Signed resolution certificate for a complaint ──────────────────────
+
+export const getResolutionCertificateAction = async (
+  complaintId: string
+): Promise<{
+  success: boolean;
+  data?: TResolutionCertificate | null;
+  message?: string;
+}> => {
+  try {
+    const currentUser = await getCurrentUserService();
+    if (!currentUser) {
+      return { success: false, message: "Not authenticated." };
+    }
+
+    const data = await getResolutionCertificateService(complaintId);
+    return { success: true, data };
+  } catch (error) {
+    console.error("getResolutionCertificateAction error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to load the resolution certificate.",
     };
   }
 };

@@ -8,10 +8,7 @@ import WelcomeEmail from "./templates/welcome-user";
 import SuccessfulComplaintRegisteredEmail from "./templates/successful-complaint-registration";
 import ComplaintMeetingCreationEmail from "./templates/complaint-meeting-creation";
 
-import type {
-  TComplaintCategory,
-  TComplaintMeetingRecipientRole,
-} from "../complaints/types";
+import type { TComplaintCategory } from "../complaints/types";
 
 export const welcomeUserEmailService = async ({
   email,
@@ -76,7 +73,6 @@ export const successfullComplaintRegistrationEmailService = async ({
 };
 
 export const complaintMeetingCreationEmailService = async ({
-  name,
   email,
   complaintId,
   meetingTitle,
@@ -85,10 +81,8 @@ export const complaintMeetingCreationEmailService = async ({
   location,
   complaintCategory,
   meeting_url,
-  recipientRole,
 }: {
-  email: string;
-  name: string;
+  email: string[];
   complaintId: string;
   meetingTitle: string;
   startTime: Date;
@@ -96,7 +90,6 @@ export const complaintMeetingCreationEmailService = async ({
   location: string;
   complaintCategory: TComplaintCategory;
   meeting_url: string | null;
-  recipientRole: TComplaintMeetingRecipientRole;
 }) => {
   const resend = resendClient;
 
@@ -108,15 +101,14 @@ export const complaintMeetingCreationEmailService = async ({
         : process.env.EMAIL_TEST_RECIPIENT!,
     subject: `Meeting Scheduled - ${complaintId}`,
     react: createElement(ComplaintMeetingCreationEmail, {
-      name,
       complaintId,
       meetingTitle,
+      meetingDate: formatInTimeZone(startTime, "Asia/Kolkata", "dd MMM yyyy"),
       startTime: formatInTimeZone(startTime, "Asia/Kolkata", "hh:mm a"),
       endTime: formatInTimeZone(endTime, "Asia/Kolkata", "hh:mm a"),
       location,
       complaintCategory,
       meeting_url,
-      recipientRole,
     }),
   });
 

@@ -4,10 +4,7 @@ import {
   WELCOME_USER_EMAIL_SCHEMA,
 } from "./schemas";
 
-import type {
-  TComplaintCategory,
-  TComplaintMeetingRecipientRole,
-} from "../complaints/types";
+import type { TComplaintCategory } from "../complaints/types";
 
 export type TComplaintRegistrationEmail = z.infer<
   typeof COMPLAINT_REGISTRATION_EMAIL_SCHEMA
@@ -36,8 +33,7 @@ export type TEmailJob =
   | {
       type: "complaint_meeting_created";
       data: {
-        email: string;
-        name: string;
+        email: string[];
         complaintId: string;
         meetingTitle: string;
         startTime: string;
@@ -45,6 +41,5 @@ export type TEmailJob =
         location: string;
         complaintCategory: TComplaintCategory;
         meeting_url: string | null;
-        recipientRole: TComplaintMeetingRecipientRole;
       };
     };

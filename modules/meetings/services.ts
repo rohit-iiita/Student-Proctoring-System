@@ -18,13 +18,17 @@ interface ComplaintWithParties {
   subject: string;
   student_id: string;
   assigned_to: string | null;
-  student: { profile: { id: string; full_name: string; email: string } | null } | null;
-  assigned: { profile: { id: string; full_name: string; email: string } | null } | null;
-  complaint_respondents:
-    | Array<{
-        student: { profile: { id: string; full_name: string; email: string } | null } | null;
-      }>
-    | null;
+  student: {
+    profile: { id: string; full_name: string; email: string } | null;
+  } | null;
+  assigned: {
+    profile: { id: string; full_name: string; email: string } | null;
+  } | null;
+  complaint_respondents: Array<{
+    student: {
+      profile: { id: string; full_name: string; email: string } | null;
+    } | null;
+  }> | null;
 }
 
 /**
@@ -61,7 +65,7 @@ export const createComplaintMeetingService = async ({
          student:students!complaint_respondents_student_id_fkey(
            profile:profiles!students_id_fkey(id, full_name, email)
          )
-       )`
+       )`,
     )
     .eq("id", input.complaintId)
     .maybeSingle();
@@ -72,13 +76,14 @@ export const createComplaintMeetingService = async ({
   const row = complaint as unknown as ComplaintWithParties;
 
   // 2. Build the unique recipient list: creator student ("favour"),
-  //    against students ("against"), assigned faculty and other admins
-  //    ("admin"). The acting admin is never a recipient.
+  //    against students ("against"), assigned faculty ("faculty") and
+  //    other admins ("admin"). The acting admin is never a recipient.
   const recipientMap = new Map<string, TMeetingRecipient>();
 
   const addRecipient = (
-    profile: { id: string; full_name: string; email: string } | null | undefined,
-    recipientRole: TMeetingRecipient["recipientRole"]
+    profile:
+      { id: string; full_name: string; email: string } | null | undefined,
+    recipientRole: TMeetingRecipient["recipientRole"],
   ) => {
     if (!profile?.id || !profile.email || recipientMap.has(profile.id)) return;
     recipientMap.set(profile.id, {
@@ -95,7 +100,7 @@ export const createComplaintMeetingService = async ({
     addRecipient(respondent.student?.profile, "against");
   }
 
-  addRecipient(row.assigned?.profile, "admin");
+  addRecipient(row.assigned?.profile, "faculty");
 
   const { data: admins, error: adminsError } = await supabase
     .from("profiles")
@@ -138,7 +143,7 @@ export const createComplaintMeetingService = async ({
         recipients.map((recipient) => ({
           meeting_id: meeting.id,
           user_id: recipient.userId,
-        }))
+        })),
       );
 
     if (participantsError) throw participantsError;
@@ -159,7 +164,7 @@ export const createComplaintMeetingService = async ({
           title: "Meeting Scheduled",
           message: `A meeting "${meeting.title}" has been scheduled for complaint (${row.reference_id}) on ${startsAt.toLocaleString(
             "en-IN",
-            { dateStyle: "medium", timeStyle: "short" }
+            { dateStyle: "medium", timeStyle: "short" },
           )}.`,
           notificationType: "meeting",
           metadata: {
@@ -167,27 +172,29 @@ export const createComplaintMeetingService = async ({
             complaintId: row.id,
             referenceId: row.reference_id,
           },
-        })
-      ),
-      ...recipients.map((recipient) =>
-        complaintMeetingCreationEmailService({
-          email: recipient.email,
-          name: recipient.fullName,
-          complaintId: row.reference_id,
-          meetingTitle: meeting.title,
-          startTime: startsAt,
-          endTime: endsAt,
-          location,
-          complaintCategory: row.category as TComplaintCategory,
-          meeting_url: meetingUrl,
-          recipientRole: recipient.recipientRole,
-        })
+        }),
       ),
     ]);
 
+    after(async () => {
+      await complaintMeetingCreationEmailService({
+        email: recipients.map((r) => r.email),
+        complaintId: row.reference_id,
+        meetingTitle: meeting.title,
+        startTime: startsAt,
+        endTime: endsAt,
+        location,
+        complaintCategory: row.category as TComplaintCategory,
+        meeting_url: meetingUrl,
+      });
+    });
+
     for (const result of results) {
       if (result.status === "rejected") {
-        console.warn("Complaint meeting notification/email failed:", result.reason);
+        console.warn(
+          "Complaint meeting notification/email failed:",
+          result.reason,
+        );
       }
     }
   });
@@ -251,7 +258,7 @@ export const getMyMeetingsService = async ({
          complaint_id,
          complaint:complaints(reference_id, subject),
          creator:profiles!meetings_created_by_fkey(full_name)
-       )`
+       )`,
     )
     .eq("user_id", userId)
     .order("meeting(starts_at)", { ascending: false });
@@ -263,7 +270,8 @@ export const getMyMeetingsService = async ({
 
   const meetingMap = new Map<string, TMeetingListItem>();
 
-  for (const raw of (participantRows ?? []) as unknown as MeetingParticipantRow[]) {
+  for (const raw of (participantRows ??
+    []) as unknown as MeetingParticipantRow[]) {
     const meeting = raw.meeting;
     if (!meeting) continue;
 
@@ -302,7 +310,7 @@ export const getMyMeetingsService = async ({
          created_at,
          complaint_id,
          complaint:complaints(reference_id, subject),
-         creator:profiles!meetings_created_by_fkey(full_name)`
+         creator:profiles!meetings_created_by_fkey(full_name)`,
       )
       .eq("created_by", userId)
       .order("starts_at", { ascending: false });
@@ -312,7 +320,9 @@ export const getMyMeetingsService = async ({
       throw createdError;
     }
 
-    for (const meeting of (createdRows ?? []) as unknown as NonNullable<MeetingParticipantRow["meeting"]>[]) {
+    for (const meeting of (createdRows ?? []) as unknown as NonNullable<
+      MeetingParticipantRow["meeting"]
+    >[]) {
       if (meetingMap.has(meeting.id)) continue;
 
       meetingMap.set(meeting.id, {
@@ -336,6 +346,6 @@ export const getMyMeetingsService = async ({
   }
 
   return Array.from(meetingMap.values()).sort(
-    (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
+    (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
   );
 };

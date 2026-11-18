@@ -1,30 +1,35 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getCurrentUserService } from "@/modules/auth/services";
+import { getMyMeetingsAction } from "@/modules/meetings/actions";
+import MeetingsList from "./_components/meetings-list";
 
-import * as React from "react";
-import Link from "next/link";
-import { Calendar, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+export const metadata = {
+  title: "Meetings - Student Proctoring System",
+  description:
+    "View complaint inquiry meetings you are invited to, with schedules, locations and your invitation response.",
+};
 
-export default function MeetingsPlaceholderPage() {
+// Auth-gated: reads cookies() per request; opt out of prerendering
+export const instant = false;
+
+export default async function MeetingsPage() {
+  const user = await getCurrentUserService();
+
+  // If not logged in, redirect to the sign-in page
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Fetch role-scoped meetings from the database via the meetings module actions
+  const response = await getMyMeetingsAction();
+
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white border border-zinc-200 rounded-2xl p-8 text-center shadow-xs">
-        <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-4">
-          <Calendar className="w-6 h-6" />
-        </div>
-        <h1 className="text-xl font-bold text-zinc-900">Meetings Management</h1>
-        <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
-          This module is part of our step-by-step build plan and will be implemented in <strong>Step (e)</strong> (schedule meetings, invite participants, and accept/decline responses).
-        </p>
-        <div className="mt-6">
-          <Link href="/dashboard">
-            <Button variant="outline" className="w-full text-xs font-medium">
-              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </div>
+    <MeetingsList
+      meetings={response.data ?? []}
+      userRole={user.role}
+      userName={user.fullName}
+      userEmail={user.email ?? ""}
+      idNumber={user.idNumber ?? null}
+    />
   );
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CREATE_MEETING_SCHEMA } from "./schemas";
+import type { TComplaintMeetingRecipientRole } from "../complaints/types";
 
 export type TCreateMeetingInput = z.infer<typeof CREATE_MEETING_SCHEMA>;
 
@@ -12,7 +13,7 @@ export interface TMeetingRecipient {
   userId: string;
   email: string;
   fullName: string;
-  recipientRole: "favour" | "against" | "admin";
+  recipientRole: TComplaintMeetingRecipientRole;
 }
 
 /** Shape returned by getMyMeetingsService — used in the meetings page */

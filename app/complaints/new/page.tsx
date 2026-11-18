@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserService } from "@/modules/auth/services";
+import { getStudentOptionsAction } from "@/modules/complaints/actions";
 import { NewComplaintForm } from "./_components/new-complaint-form";
 
 export const metadata = {
@@ -19,5 +20,12 @@ export default async function NewComplaintPage() {
     redirect("/login");
   }
 
-  return <NewComplaintForm user={user} />;
+  // Fetch the student directory for the respondent multi-select picker.
+  // Non-students see the access-required card anyway, so failures stay silent.
+  const studentsResponse =
+    user.role === "student" ? await getStudentOptionsAction() : { data: [] };
+
+  return (
+    <NewComplaintForm user={user} studentOptions={studentsResponse.data ?? []} />
+  );
 }
